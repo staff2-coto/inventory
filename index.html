@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>設備在庫管理</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { max-width: 100%; overflow-x: hidden; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-serif; background: #f0f0ee; color: #1a1a1a; -webkit-text-size-adjust: 100%; overflow-x: hidden; touch-action: manipulation; }
+.sp-nav { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+.layout { display: flex; min-height: 100vh; }
+/* サイドバー */
+.sidebar { width: 220px; flex-shrink: 0; background: #1a1a1a; color: #fff; padding: 24px 0; position: fixed; top: 0; left: 0; height: 100vh; display: flex; flex-direction: column; overflow-y: auto; }
+.sidebar-title { font-size: 15px; font-weight: 600; padding: 0 20px 20px; border-bottom: 1px solid #333; }
+.sidebar-sub { font-size: 11px; color: #888; margin-top: 3px; font-weight: 400; }
+.sidebar-section { padding: 12px 12px 0; }
+.sidebar-section-label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.08em; padding: 0 8px; margin-bottom: 4px; }
+.nav-item { display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 12px; border-radius: 8px; font-size: 14px; cursor: pointer; color: #aaa; margin-bottom: 2px; border: none; background: none; width: 100%; text-align: left; }
+.nav-item.active { background: #2e2e2e; color: #fff; }
+.nav-item:hover:not(.active) { background: #252525; color: #ddd; }
+.nav-icon { font-size: 15px; width: 20px; text-align: center; }
+.sidebar-divider { height: 1px; background: #2a2a2a; margin: 12px 0; }
+/* メイン */
+.main { margin-left: 220px; flex: 1; padding: 28px 32px; }
+.page { display: none; }
+.page.active { display: block; }
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.page-header h1 { font-size: 22px; font-weight: 600; }
+.page-header p { font-size: 13px; color: #888; margin-top: 3px; }
+.btn-primary { height: 38px; padding: 0 18px; border-radius: 8px; background: #1a1a1a; color: #fff; border: none; font-size: 14px; cursor: pointer; font-weight: 600; white-space: nowrap; }
+.btn-primary:hover { background: #333; }
+/* サマリー */
+.summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+.summary-card { background: #fff; border-radius: 12px; padding: 16px 18px; border: 1px solid #e8e8e8; }
+.summary-label { font-size: 12px; color: #888; }
+.summary-value { font-size: 26px; font-weight: 600; margin-top: 4px; }
+/* フィルター */
+.filter-area { background: #fff; border-radius: 12px; border: 1px solid #e8e8e8; padding: 16px; margin-bottom: 16px; }
+.filter-row { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px; }
+.filter-row:last-child { margin-bottom: 0; }
+.filter-label { font-size: 12px; color: #888; width: 60px; flex-shrink: 0; padding-top: 6px; }
+.chip-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { height: 30px; padding: 0 12px; border-radius: 99px; border: 1px solid #ddd; font-size: 12px; cursor: pointer; background: #fff; color: #666; white-space: nowrap; }
+.chip.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+.search-input { width: 100%; height: 36px; border-radius: 8px; border: 1px solid #ddd; padding: 0 14px; font-size: 14px; background: #fff; }
+/* 品目グリッド */
+.item-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.item-card { background: #fff; border: 1px solid #e8e8e8; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; }
+.item-header { display: flex; justify-content: space-between; align-items: flex-start; }
+.item-name { font-size: 14px; font-weight: 600; line-height: 1.5; }
+.item-id { font-size: 11px; color: #aaa; margin-top: 2px; }
+.item-stock { text-align: right; flex-shrink: 0; margin-left: 10px; }
+.stock-num { font-size: 28px; font-weight: 600; line-height: 1; }
+.stock-unit { font-size: 11px; color: #888; }
+.stock-zero { color: #c0392b; }
+.item-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.tag { display: inline-block; font-size: 10px; padding: 2px 8px; border-radius: 99px; }
+.tag-cat { background: #f0f0f0; color: #555; }
+.tag-prop { background: #e8f0fe; color: #1a5dc8; }
+.tag-zero { background: #fde8e8; color: #c0392b; }
+.tag-ok { background: #e8f5e9; color: #2e7d32; }
+.item-memo { font-size: 11px; color: #888; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f0f0f0; line-height: 1.5; }
+.item-actions { display: flex; gap: 6px; margin-top: auto; padding-top: 12px; }
+.item-actions button { flex: 1; height: 34px; border-radius: 8px; border: 1px solid #ddd; font-size: 12px; cursor: pointer; background: #f5f5f5; }
+.item-actions button:hover { background: #ebebeb; }
+.btn-edit { background: #fff !important; border-color: #bbb !important; color: #1a1a1a; font-weight: 600; }
+.btn-del { background: #fff !important; border-color: #e8e8e8 !important; color: #c0392b !important; }
+/* マスター管理リスト */
+.master-list { background: #fff; border-radius: 12px; border: 1px solid #e8e8e8; overflow: hidden; }
+.master-item { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid #f0f0f0; cursor: default; transition: background 0.1s; }
+.master-item:last-child { border-bottom: none; }
+.master-item.dragging { opacity: 0.4; background: #f5f5f5; }
+.master-item.drag-over { background: #f0f5ff; border-top: 2px solid #1a5dc8; }
+.master-item-left { display: flex; align-items: center; gap: 12px; }
+.drag-handle { color: #ccc; font-size: 18px; cursor: grab; line-height: 1; user-select: none; padding: 4px 2px; touch-action: none; }
+.drag-handle:active { cursor: grabbing; }
+.master-item-name { font-size: 15px; font-weight: 500; }
+.master-item-count { font-size: 12px; color: #888; margin-top: 2px; }
+.master-item-actions { display: flex; gap: 8px; }
+.btn-sm { height: 30px; padding: 0 14px; border-radius: 6px; border: 1px solid #ddd; font-size: 12px; cursor: pointer; background: #f5f5f5; color: #1a1a1a; }
+.btn-sm:hover { background: #ebebeb; }
+.btn-sm-danger { border-color: #f0c0c0 !important; color: #c0392b !important; background: #fff !important; }
+.empty-master { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
+/* 履歴テーブル */
+.log-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; border: 1px solid #e8e8e8; }
+.log-table th { background: #f5f5f5; font-size: 12px; color: #888; font-weight: 600; padding: 10px 16px; text-align: left; border-bottom: 1px solid #e8e8e8; }
+.log-table td { font-size: 13px; padding: 12px 16px; border-bottom: 1px solid #f5f5f5; }
+.log-table tr:last-child td { border-bottom: none; }
+.log-plus { color: #2e7d32; font-weight: 600; }
+.log-minus { color: #c0392b; font-weight: 600; }
+/* モーダル */
+.modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 100; }
+.modal-bg.open { display: flex; }
+.modal { background: #fff; border-radius: 16px; padding: 28px; width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto; }
+.modal h2 { font-size: 17px; font-weight: 600; margin-bottom: 20px; }
+.form-row { margin-bottom: 14px; }
+.form-row label { display: block; font-size: 13px; color: #888; margin-bottom: 6px; }
+.form-row input[type=text], .form-row input[type=number], .form-row select { width: 100%; height: 42px; border-radius: 8px; border: 1px solid #ddd; padding: 0 12px; font-size: 15px; background: #fff; color: #1a1a1a; }
+.form-row textarea { width: 100%; border-radius: 8px; border: 1px solid #ddd; padding: 10px 12px; font-size: 13px; background: #fff; color: #1a1a1a; resize: vertical; min-height: 60px; }
+.prop-checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.prop-checkbox-label { display: flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; background: #f5f5f5; padding: 5px 10px; border-radius: 99px; border: 1px solid #e8e8e8; }
+.prop-checkbox-label input { width: 14px; height: 14px; cursor: pointer; }
+.prop-checkbox-label.checked { background: #e8f0fe; border-color: #aac4f0; color: #1a5dc8; }
+.qty-row { display: flex; align-items: center; gap: 12px; }
+.qty-btn { width: 42px; height: 42px; border-radius: 8px; border: 1px solid #ddd; font-size: 20px; cursor: pointer; background: #f5f5f5; display: flex; align-items: center; justify-content: center; }
+.qty-input { flex: 1; height: 42px; text-align: center; border-radius: 8px; border: 1px solid #ddd; font-size: 18px; }
+.modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+.modal-actions button { flex: 1; height: 46px; border-radius: 10px; font-size: 15px; cursor: pointer; border: 1px solid #ddd; background: #f5f5f5; color: #1a1a1a; }
+.modal-actions .confirm { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+.modal-actions .danger { background: #fff; color: #c0392b; border-color: #c0392b; }
+.divider { height: 1px; background: #f0f0f0; margin: 16px 0; }
+.tag-alert { background: #fef3e2; color: #e67e22; }
+.tag-ordered { background: #e8f5e9; color: #2e7d32; }
+.tag-waiting { background: #fff3e0; color: #f57c00; }
+.order-btn-group { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.order-btn { height: 26px; padding: 0 10px; border-radius: 99px; border: 1px solid #ddd; font-size: 11px; cursor: pointer; background: #f5f5f5; color: #555; }
+.order-btn.active-ordered { background: #e8f5e9; border-color: #a5d6a7; color: #2e7d32; font-weight: 600; }
+.order-btn.active-waiting { background: #fff3e0; border-color: #ffcc80; color: #f57c00; font-weight: 600; }
+.stocktake-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; border: 1px solid #e8e8e8; }
+.stocktake-table th { background: #f5f5f5; font-size: 12px; color: #888; font-weight: 600; padding: 10px 16px; text-align: left; border-bottom: 1px solid #e8e8e8; }
+.stocktake-table td { font-size: 13px; padding: 10px 16px; border-bottom: 1px solid #f5f5f5; vertical-align: middle; }
+.stocktake-table tr:last-child td { border-bottom: none; }
+.stocktake-table input[type=number] { width: 80px; height: 34px; border-radius: 6px; border: 1px solid #ddd; padding: 0 8px; font-size: 14px; text-align: center; }
+.stocktake-changed { background: #fffde7 !important; }
+.car-stock-row { display: flex; gap: 16px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #f0f0f0; }
+.car-stock-item { font-size: 12px; color: #888; }
+.car-stock-item span { display: block; font-size: 15px; font-weight: 600; color: #1a1a1a; margin-top: 2px; }
+.car-stock-item span.in-car { color: #1a5dc8; }
+.empty { text-align: center; padding: 48px 0; font-size: 14px; color: #aaa; grid-column: 1/-1; }
+/* スマホ */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; padding: 0; }
+  .sp-nav { display: flex; background: #1a1a1a; padding: 8px; gap: 4px; flex-wrap: wrap; }
+  .sp-nav-item { flex: 1; min-width: calc(20% - 4px); height: 34px; padding: 0 8px; border-radius: 8px; font-size: 12px; cursor: pointer; color: #888; border: none; background: none; white-space: nowrap; text-align: center; }
+  .sp-nav-item.active { background: #2e2e2e; color: #fff; }
+  .page-header { padding: 16px 16px 0; }
+  .page-header h1 { font-size: 19px; }
+  .summary-grid { grid-template-columns: 1fr 1fr; padding: 12px 16px 0; margin-bottom: 0; gap: 8px; }
+  .summary-card { border: none; background: #f5f5f5; padding: 12px; }
+  .summary-value { font-size: 20px; }
+  .filter-area { margin: 12px 16px 0; border-radius: 10px; padding: 12px; }
+  .filter-label { width: 44px; font-size: 11px; }
+  .chip { height: 28px; font-size: 11px; padding: 0 10px; }
+  .item-grid { grid-template-columns: 1fr; padding: 12px 16px 16px; gap: 10px; }
+  .stock-num { font-size: 26px; }
+  .master-list { margin: 0 16px 16px; }
+  #log-content { padding: 16px; }
+  .log-table th, .log-table td { padding: 10px; font-size: 12px; }
+  .modal { border-radius: 20px 20px 0 0; position: fixed; bottom: 0; left: 0; right: 0; max-width: 100%; max-height: 92vh; padding: 24px 20px 40px; }
+  .modal-bg.open { align-items: flex-end; }
+  .page-header { margin-bottom: 12px; }
+}
+@media (min-width: 769px) {
+  .sp-nav { display: none; }
+  .page { padding: 0; }
+}
+</style>
+<style>
+#login-screen {
+  position: fixed; inset: 0; background: #1F3864;
+  display: flex; align-items: center; justify-content: center; z-index: 9999;
+}
+#login-screen.hidden { display: none; }
+.login-box {
+  background: #fff; border-radius: 16px; padding: 40px 32px;
+  width: 320px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.login-title { font-size: 20px; font-weight: 700; color: #1F3864; margin-bottom: 4px; text-align: center; }
+.login-sub { font-size: 12px; color: #888; text-align: center; margin-bottom: 28px; }
+.login-label { font-size: 12px; color: #555; font-weight: 600; margin-bottom: 6px; display: block; }
+.login-input {
+  width: 100%; height: 44px; border-radius: 8px; border: 1px solid #ddd;
+  padding: 0 14px; font-size: 15px; margin-bottom: 16px;
+}
+.login-input:focus { outline: none; border-color: #2E75B6; }
+.login-btn {
+  width: 100%; height: 46px; background: #1F3864; color: #fff;
+  border: none; border-radius: 10px; font-size: 15px; font-weight: 600;
+  cursor: pointer; margin-top: 4px;
+}
+.login-btn:hover { background: #2E75B6; }
+.login-error { font-size: 12px; color: #c0392b; text-align: center; margin-top: 12px; display: none; }
+</style>
+</head>
+<body>
+
+<!-- ログイン画面 -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-title">設備在庫管理</div>
+    <div class="login-sub">ハウスクリーニング</div>
+    <label class="login-label">ID</label>
+    <input type="text" id="login-id" class="login-input" placeholder="IDを入力" autocomplete="username" />
+    <label class="login-label">パスワード</label>
+    <input type="password" id="login-pass" class="login-input" placeholder="パスワードを入力" autocomplete="current-password"
+      onkeydown="if(event.key==='Enter')doLogin()" />
+    <button class="login-btn" onclick="doLogin()">ログイン</button>
+    <div class="login-error" id="login-error">IDまたはパスワードが違います</div>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-title">設備在庫管理<div class="sidebar-sub">ハウスクリーニング</div></div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">メイン</div>
+      <button class="nav-item active" onclick="showPage('inventory')"><span class="nav-icon">📦</span>在庫一覧</button>
+      <button class="nav-item" onclick="showPage('car')"><span class="nav-icon">🚗</span>車載在庫</button>
+      <button class="nav-item" onclick="showPage('log')"><span class="nav-icon">📋</span>入出庫履歴</button>
+      <button class="nav-item" onclick="showPage('stocktake')"><span class="nav-icon">✅</span>棚卸し</button>
+    </div>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section">
+      <div class="sidebar-section-label">マスター管理</div>
+      <button class="nav-item" onclick="showPage('categories')"><span class="nav-icon">🗂</span>設備種類</button>
+      <button class="nav-item" onclick="showPage('properties')"><span class="nav-icon">🏢</span>物件名</button>
+      <button class="nav-item" onclick="showPage('staff')"><span class="nav-icon">👤</span>スタッフ</button>
+      <button class="nav-item" onclick="showPage('csv')"><span class="nav-icon">📥</span>CSV管理</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- スマホナビ -->
+    <div class="sp-nav">
+      <button class="sp-nav-item active" onclick="showPage('inventory')">在庫一覧</button>
+      <button class="sp-nav-item" onclick="showPage('car')">車載在庫</button>
+      <button class="sp-nav-item" onclick="showPage('log')">入出庫履歴</button>
+      <button class="sp-nav-item" onclick="showPage('stocktake')">棚卸し</button>
+      <button class="sp-nav-item" onclick="showPage('categories')">設備種類</button>
+      <button class="sp-nav-item" onclick="showPage('properties')">物件名</button>
+      <button class="sp-nav-item" onclick="showPage('staff')">スタッフ</button>
+      <button class="sp-nav-item" onclick="showPage('csv')">CSV</button>
+    </div>
+
+    <!-- 車載在庫 -->
+    <div id="page-car" class="page">
+      <div class="page-header">
+        <div><h1>車載在庫</h1><p>現在車に積まれている部品の一覧です</p></div>
+      </div>
+      <div class="summary-grid" style="grid-template-columns:1fr 1fr;margin-bottom:20px">
+        <div class="summary-card"><div class="summary-label">車載品目数</div><div class="summary-value" id="car-item-count" style="color:#1a5dc8">-</div></div>
+        <div class="summary-card"><div class="summary-label">車載合計数</div><div class="summary-value" id="car-total-count" style="color:#1a5dc8">-</div></div>
+      </div>
+      <div id="car-list"></div>
+    </div>
+
+    <!-- 在庫一覧 -->
+    <div id="page-inventory" class="page active">
+      <div class="page-header">
+        <div><h1>在庫一覧</h1><p id="last-updated"></p></div>
+        <button class="btn-primary" onclick="openAdd()">＋ 品目追加</button>
+      </div>
+      <div class="summary-grid">
+        <div class="summary-card"><div class="summary-label">総品目数</div><div class="summary-value" id="total-items">-</div></div>
+        <div class="summary-card" id="zero-card" onclick="toggleZeroFilter()" style="cursor:pointer" title="クリックで在庫ゼロのみ表示"><div class="summary-label">在庫ゼロ</div><div class="summary-value" style="color:#c0392b" id="zero-items">-</div></div>
+        <div class="summary-card" id="alert-card" onclick="toggleAlertFilter()" style="cursor:pointer" title="クリックで在庫少のみ表示"><div class="summary-label">在庫少（要発注）</div><div class="summary-value" style="color:#e67e22" id="alert-items">-</div></div>
+        <div class="summary-card"><div class="summary-label">設備種類</div><div class="summary-value" id="cat-count">-</div></div>
+      </div>
+      <div class="filter-area">
+        <div class="filter-row"><span class="filter-label">設備種類</span><div class="chip-group" id="cat-chips"></div></div>
+        <div class="filter-row"><span class="filter-label">物件名</span><div class="chip-group" id="prop-chips"></div></div>
+        <div class="filter-row"><span class="filter-label">検索</span><input type="text" class="search-input" id="search-input" placeholder="品名・IDで検索" oninput="renderItems()" /></div>
+      </div>
+      <div class="item-grid" id="item-list"></div>
+    </div>
+
+    <!-- CSV管理 -->
+    <div id="page-csv" class="page">
+      <div class="page-header">
+        <div><h1>CSV管理</h1><p>品目データのエクスポート・インポートができます</p></div>
+      </div>
+
+      <!-- Airレジ売上CSV取込 -->
+      <div style="background:#fff;border-radius:12px;border:1px solid #e8e8e8;padding:24px;margin-bottom:20px">
+        <h2 style="font-size:16px;font-weight:600;margin-bottom:8px">💳 Airレジ売上CSV取込</h2>
+        <p style="font-size:13px;color:#888;margin-bottom:16px">AirレジバックオフィスからエクスポートしたCSVをインポートすると、販売数に応じて車載在庫が自動で減算されます。</p>
+        <div style="background:#f5f5f5;border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#555">
+          <strong>手順：</strong> Airレジバックオフィス → 売上 → 商品別売上 → CSVダウンロード
+        </div>
+        <div style="margin-bottom:12px">
+          <input type="file" id="airregi-csv-input" accept=".csv" onchange="previewAirregiCSV(event)" style="font-size:13px" />
+        </div>
+        <div id="airregi-preview" style="display:none">
+          <div style="font-size:13px;color:#555;margin-bottom:8px" id="airregi-preview-label"></div>
+          <div style="max-height:200px;overflow-y:auto;border:1px solid #e8e8e8;border-radius:8px;margin-bottom:12px">
+            <table class="stocktake-table" id="airregi-preview-table"></table>
+          </div>
+          <button class="btn-primary" onclick="importAirregiCSV()">車載在庫に反映</button>
+          <button onclick="cancelAirregiCSV()" style="margin-left:10px;height:38px;padding:0 16px;border-radius:8px;border:1px solid #ddd;font-size:14px;cursor:pointer;background:#f5f5f5">キャンセル</button>
+        </div>
+      </div>
+
+      <!-- エクスポート -->
+      <div style="background:#fff;border-radius:12px;border:1px solid #e8e8e8;padding:24px;margin-bottom:20px">
+        <h2 style="font-size:16px;font-weight:600;margin-bottom:8px">📤 エクスポート</h2>
+        <p style="font-size:13px;color:#888;margin-bottom:16px">現在の全品目データをCSVファイルでダウンロードします。Excelやスプレッドシートで編集後、インポートで反映できます。</p>
+        <div style="background:#f5f5f5;border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#555">
+          <strong>CSVの列構成：</strong> ID・品名・設備種類・物件名・在庫数・最低在庫数・備考
+        </div>
+        <button class="btn-primary" onclick="exportCSV()">CSVをダウンロード</button>
+      </div>
+
+      <!-- インポート -->
+      <div style="background:#fff;border-radius:12px;border:1px solid #e8e8e8;padding:24px">
+        <h2 style="font-size:16px;font-weight:600;margin-bottom:8px">📥 インポート</h2>
+        <p style="font-size:13px;color:#888;margin-bottom:16px">編集したCSVをアップロードして品目データを更新します。IDが一致する品目は上書き更新、新しいIDは新規追加されます。</p>
+        <div style="background:#fef3e2;border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#e67e22">
+          ⚠️ インポートすると既存データが上書きされます。必ず事前にエクスポートしてバックアップを取ってください。
+        </div>
+        <div style="margin-bottom:12px">
+          <input type="file" id="csv-file-input" accept=".csv" onchange="previewCSV(event)" style="font-size:13px" />
+        </div>
+        <div id="csv-preview" style="display:none">
+          <div style="font-size:13px;color:#555;margin-bottom:8px" id="csv-preview-label"></div>
+          <div style="max-height:200px;overflow-y:auto;border:1px solid #e8e8e8;border-radius:8px;margin-bottom:12px">
+            <table class="stocktake-table" id="csv-preview-table"></table>
+          </div>
+          <button class="btn-primary" onclick="importCSV()">インポートを実行</button>
+          <button onclick="cancelCSV()" style="margin-left:10px;height:38px;padding:0 16px;border-radius:8px;border:1px solid #ddd;font-size:14px;cursor:pointer;background:#f5f5f5">キャンセル</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 棚卸し -->
+    <div id="page-stocktake" class="page">
+      <div class="page-header">
+        <div><h1>棚卸し</h1><p>実際の在庫数を入力して一括更新します</p></div>
+        <button class="btn-primary" onclick="applyStocktake()">一括更新を確定</button>
+      </div>
+      <div class="filter-area" style="margin-bottom:16px">
+        <div class="filter-row">
+          <span class="filter-label">設備種類</span>
+          <div class="chip-group" id="stocktake-cat-chips"></div>
+        </div>
+      </div>
+      <div id="stocktake-list"></div>
+    </div>
+
+    <!-- 入出庫履歴 -->
+    <div id="page-log" class="page">
+      <div class="page-header"><div><h1>入出庫履歴</h1></div></div>
+      <div class="filter-area" style="margin-bottom:16px">
+        <div class="filter-row">
+          <span class="filter-label">種別</span>
+          <div class="chip-group">
+            <button class="chip active" id="log-filter-all" onclick="setLogType('all')">すべて</button>
+            <button class="chip" id="log-filter-in" onclick="setLogType('in')">入庫</button>
+            <button class="chip" id="log-filter-out" onclick="setLogType('out')">出庫</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">担当者</span>
+          <div class="chip-group" id="log-staff-chips"></div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">検索</span>
+          <input type="text" class="search-input" id="log-search" placeholder="品名で検索" oninput="renderLogs()" />
+        </div>
+      </div>
+      <div id="log-content">
+        <table class="log-table">
+          <thead><tr><th>日時</th><th>品名</th><th>種別</th><th>数量</th><th>担当者</th><th>内容</th></tr></thead>
+          <tbody id="log-body"><tr><td colspan="6" style="text-align:center;padding:40px;color:#aaa">まだ記録がありません</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 設備種類管理 -->
+    <div id="page-categories" class="page">
+      <div class="page-header">
+        <div><h1>設備種類</h1><p>品目に紐づく設備の種類を管理します</p></div>
+        <button class="btn-primary" onclick="openAddMaster('category')">＋ 追加</button>
+      </div>
+      <div class="master-list" id="category-list"></div>
+    </div>
+
+    <!-- 物件名管理 -->
+    <div id="page-properties" class="page">
+      <div class="page-header">
+        <div><h1>物件名</h1><p>品目に紐づくマンション名を管理します</p></div>
+        <button class="btn-primary" onclick="openAddMaster('property')">＋ 追加</button>
+      </div>
+      <div class="master-list" id="property-list"></div>
+    </div>
+
+    <!-- スタッフ管理 -->
+    <div id="page-staff" class="page">
+      <div class="page-header">
+        <div><h1>スタッフ</h1><p id="current-user-label">入出庫記録に使うスタッフ名を管理します</p></div>
+        <button class="btn-primary" onclick="openAddMaster('staff')">＋ 追加</button>
+      </div>
+      <div style="background:#e8f0fe;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-size:12px;color:#1a5dc8">このデバイスの担当者</div>
+          <div style="font-size:16px;font-weight:600;margin-top:2px" id="whoami-display">未設定</div>
+        </div>
+        <button onclick="openWhoami()" style="height:34px;padding:0 16px;border-radius:8px;border:1px solid #aac4f0;font-size:13px;cursor:pointer;background:#fff;color:#1a5dc8;font-weight:600">変更</button>
+      </div>
+      <div class="master-list" id="staff-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 初回ユーザー設定モーダル -->
+<div class="modal-bg" id="modal-whoami">
+  <div class="modal">
+    <h2>はじめに</h2>
+    <p style="font-size:14px;color:#888;margin-bottom:20px">あなたの名前を選んでください。入出庫の担当者として自動で入力されます。</p>
+    <div class="form-row">
+      <label>あなたの名前</label>
+      <select id="whoami-select"></select>
+    </div>
+    <p style="font-size:12px;color:#aaa;margin-top:8px">※この設定はこのデバイスに保存されます。スタッフページからいつでも変更できます。</p>
+    <div class="modal-actions" style="margin-top:20px">
+      <button class="confirm" onclick="saveWhoami()">決定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 入庫・出庫モーダル -->
+<div class="modal-bg" id="modal-io">
+  <div class="modal">
+    <h2 id="modal-io-title">出庫を記録</h2>
+    <div class="form-row"><label>品名</label><div style="font-size:15px;font-weight:600" id="modal-io-name"></div></div>
+    <div class="form-row">
+      <label>担当者</label>
+      <div style="font-size:15px;font-weight:600" id="modal-staff-name"></div>
+    </div>
+    <div class="form-row" id="modal-type-row" style="display:none">
+      <label>種別</label>
+      <div style="display:flex;gap:8px">
+        <button id="io-type-warehouse" class="order-btn" onclick="setIOSubType('warehouse')" style="flex:1;height:36px;font-size:13px">倉庫へ返却</button>
+        <button id="io-type-car" class="order-btn" onclick="setIOSubType('car')" style="flex:1;height:36px;font-size:13px">車に積込</button>
+      </div>
+    </div>
+    <div class="form-row">
+      <label>変更数量</label>
+      <div class="qty-row">
+        <button class="qty-btn" onclick="changeQty(-1)">－</button>
+        <input type="number" inputmode="numeric" class="qty-input" id="modal-qty" value="1" min="1" />
+        <button class="qty-btn" onclick="changeQty(1)">＋</button>
+      </div>
+    </div>
+    <div style="font-size:12px;color:#888;margin-top:4px" id="modal-stock-hint"></div>
+    <div class="modal-actions">
+      <button onclick="closeAll()">キャンセル</button>
+      <button class="confirm" id="modal-io-btn" onclick="confirmIO()">確定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 品目追加・編集モーダル -->
+<div class="modal-bg" id="modal-form">
+  <div class="modal">
+    <h2 id="modal-form-title">品目を追加</h2>
+    <div class="form-row"><label>品名</label><input type="text" id="form-name" placeholder="品名を入力" /></div>
+    <div class="form-row">
+      <label>設備種類</label>
+      <select id="form-category"></select>
+    </div>
+    <div class="form-row">
+      <label>物件名（複数選択可）</label>
+      <div class="prop-checkbox-group" id="form-prop-checks"></div>
+    </div>
+    <div class="form-row"><label>在庫数</label><input type="number" inputmode="numeric" id="form-stock" value="0" min="0" /></div>
+    <div class="form-row"><label>最低在庫数（この数を下回ると警告）</label><input type="number" inputmode="numeric" id="form-minstock" value="0" min="0" /></div>
+    <div class="form-row"><label>備考</label><textarea id="form-memo" placeholder="型番・注意事項など"></textarea></div>
+    <div class="divider"></div>
+    <div class="modal-actions" id="form-actions"></div>
+  </div>
+</div>
+
+<!-- マスター追加・編集モーダル -->
+<div class="modal-bg" id="modal-master">
+  <div class="modal">
+    <h2 id="modal-master-title">設備種類を追加</h2>
+    <div class="form-row">
+      <label id="modal-master-label">設備種類名</label>
+      <input type="text" id="master-input" placeholder="名前を入力" />
+    </div>
+    <div class="modal-actions" id="master-actions"></div>
+  </div>
+</div>
+
+<script>
+const ITEMS_DATA = [{"id": 10002, "name": "サニタリー吸気フィルター", "category": "換気設備", "properties": ["フォレシス"], "stock": 0, "memo": "完売したら今後発注なし。155×155"}, {"id": 10003, "name": "サニタリー吸気フィルター/AT-100QKF2-F", "category": "換気設備", "properties": ["フォレシス", "タワーズ", "ナビューレ"], "stock": 46, "memo": "サランネット、ナビューレの給気フィルタ小を使用"}, {"id": 10004, "name": "玄関給気フィルター", "category": "換気設備", "properties": ["フォレシス"], "stock": 34, "memo": "195×195"}, {"id": 10005, "name": "電動給気シャッター/AT-150TQEF2", "category": "換気設備", "properties": ["フォレシス"], "stock": 4, "memo": ""}, {"id": 10006, "name": "トイレ換気扇", "category": "換気設備", "properties": ["フォレシス"], "stock": 2, "memo": "VD-10ZC14-C"}, {"id": 10007, "name": "給排気グリル", "category": "換気設備", "properties": ["フォレシス", "ナビューレ"], "stock": 5, "memo": ""}, {"id": 10008, "name": "ベント(中間)ファンモータ−", "category": "換気設備", "properties": ["フォレシス"], "stock": 3, "memo": "VF-3HTPCRM-ATC　製造番号:99020307"}, {"id": 10009, "name": "居室用換気フィルター小（黒）", "category": "換気設備", "properties": ["タワーズ"], "stock": 0, "memo": ""}, {"id": 10010, "name": "給排気グリル", "category": "換気設備", "properties": ["タワーズ"], "stock": 0, "memo": "P-13GLF4　現行品：P-13GLF6"}, {"id": 10011, "name": "サニタリー吸気フィルター大", "category": "換気設備", "properties": ["ナビューレ"], "stock": 35, "memo": "AT-150QKF2-F"}, {"id": 10012, "name": "サニタリー吸気フィルター小", "category": "換気設備", "properties": ["ナビューレ"], "stock": 44, "memo": ""}, {"id": 10013, "name": "玄関給気側フィルター", "category": "換気設備", "properties": ["ナビューレ"], "stock": 20, "memo": "PS-300（ﾐｼﾝ加工 ・ﾚｻﾞｰ無）200角"}, {"id": 10014, "name": "給排気グリル", "category": "換気設備", "properties": ["ナビューレ"], "stock": 0, "memo": ""}, {"id": 10015, "name": "外気浄化フィルター（標準）", "category": "換気設備", "properties": ["ブリリア"], "stock": 23, "memo": ""}, {"id": 10016, "name": "外気浄化フィルター（花粉対策）(ﾌﾞﾘﾘｱ）", "category": "換気設備", "properties": ["ブリリア"], "stock": 15, "memo": ""}, {"id": 10017, "name": "ロスナイ給気側フィルター★純正品", "category": "ロスナイ", "properties": ["フォレシス", "ナビューレ"], "stock": 2, "memo": "M45 300 717　　　ナビューレと同じ　袋づめ"}, {"id": 10018, "name": "ロスナイ給気側フィルター★同等品", "category": "ロスナイ", "properties": ["フォレシス", "ナビューレ"], "stock": 48, "memo": "PS-300 120×450　　ナビューレと同じ"}, {"id": 10019, "name": "ロスナイ排気側フィルター", "category": "ロスナイ", "properties": ["フォレシス", "ナビューレ"], "stock": 17, "memo": "M36 324 718　ナビューレと同じ"}, {"id": 10020, "name": "ロスナイ高性能除じんフィルター", "category": "ロスナイ", "properties": ["フォレシス", "ナビューレ"], "stock": 15, "memo": "M35 843 717　ナビューレと同じ"}, {"id": 10021, "name": "ロスナイ防虫フィルター", "category": "ロスナイ", "properties": ["フォレシス", "ナビューレ"], "stock": 10, "memo": "M36 324 717　ナビューレと同じ"}, {"id": 10022, "name": "ロスナイエレメント", "category": "ロスナイ", "properties": ["フォレシス", "ナビューレ"], "stock": 17, "memo": "M36 327 719 　120×450　ナビューレと同じ、※25.6供給終了"}, {"id": 10023, "name": "ロスナイモータ M36258 451", "category": "ロスナイ", "properties": ["フォレシス", "ナビューレ"], "stock": 30, "memo": "M36258451・452　ナビューレと同じ　※26.3 供給終了"}, {"id": 10024, "name": "ロスナイモータ M36258 452", "category": "ロスナイ", "properties": ["フォレシス", "ナビューレ"], "stock": 33, "memo": ""}, {"id": 10025, "name": "ロスナイファン", "category": "ロスナイ", "properties": ["フォレシス", "ナビューレ", "タワーズ"], "stock": 0, "memo": "M36093481"}, {"id": 10026, "name": "給排気側フィルターP-50F/M36 093 717", "category": "ロスナイ", "properties": ["タワーズ"], "stock": 31, "memo": "2枚１セットで販売"}, {"id": 10027, "name": "給排気側フィルターP-30F/M35 003 719", "category": "ロスナイ", "properties": ["タワーズ"], "stock": 20, "memo": ""}, {"id": 10028, "name": "給排気側フィルター枠P-30枠(2個)/M35 146 717", "category": "ロスナイ", "properties": ["タワーズ"], "stock": 6, "memo": ""}, {"id": 10029, "name": "ﾛｽﾅｲﾓｰﾀ-(VL-200,150ZM用)M36096451/452", "category": "ロスナイ", "properties": ["タワーズ"], "stock": 0, "memo": "451は生産終了・452のみ在庫有"}, {"id": 10030, "name": "ﾛｽﾅｲﾓｰﾀ-ﾍﾞｱﾘﾝｸﾞ(VL-200,150ZM用)M36096451/452", "category": "ロスナイ", "properties": ["タワーズ"], "stock": 0, "memo": ""}, {"id": 10031, "name": "ロスナイエレメント/M36 095 710", "category": "ロスナイ", "properties": ["タワーズ"], "stock": 8, "memo": "25.7 供給終了"}, {"id": 10032, "name": "ロスナイファン/M36 093 480", "category": "ロスナイ", "properties": ["タワーズ"], "stock": 4, "memo": "黒"}, {"id": 10033, "name": "ロスナイモータ M36258453・454", "category": "ロスナイ", "properties": ["ナビューレ"], "stock": 21, "memo": "倉庫に453・23個　454・23個"}, {"id": 10034, "name": "FCU用＃100＃200?C約460mm×160mm", "category": "ファンコイル", "properties": ["フォレシス"], "stock": 34, "memo": "PS-300"}, {"id": 10035, "name": "FCU用＃300?D 約560mm×160mm", "category": "ファンコイル", "properties": ["フォレシス"], "stock": 54, "memo": "PS-300"}, {"id": 10036, "name": "FCU用#400?E 約660mm×160mm", "category": "ファンコイル", "properties": ["フォレシス", "タワーズ"], "stock": 50, "memo": "PS-300　タワーズと同じ"}, {"id": 10037, "name": "FCU用#600?G 約860mm×160mm", "category": "ファンコイル", "properties": ["フォレシス", "タワーズ"], "stock": 4, "memo": "PS-300　タワーズと同じ"}, {"id": 10038, "name": "二方弁電動バルブ65FBW-1F-04-15", "category": "ファンコイル", "properties": ["フォレシス"], "stock": 16, "memo": ""}, {"id": 10039, "name": "二方弁電動バルブ65FBW-1F-04-20", "category": "ファンコイル", "properties": ["フォレシス"], "stock": 9, "memo": "デフォルトは15"}, {"id": 10040, "name": "二方弁電動バルブ61FBW-1Ｒ08-20", "category": "ファンコイル", "properties": ["フォレシス"], "stock": 3, "memo": ""}, {"id": 10041, "name": "FCUリモコン本体", "category": "ファンコイル", "properties": ["フォレシス"], "stock": 13, "memo": ""}, {"id": 10042, "name": "FCUリモコンカバーRBB-CN用", "category": "ファンコイル", "properties": ["フォレシス"], "stock": 44, "memo": "No.31421、2026/03/26 車内リモコンは未カウント"}, {"id": 10043, "name": "ﾌｧﾝｺｲﾙﾊﾟﾜｰﾕﾆｯﾄ基盤　RBB-PT-LS", "category": "ファンコイル", "properties": ["フォレシス"], "stock": 4, "memo": ""}, {"id": 10044, "name": "吹出口(600×135)", "category": "ファンコイル", "properties": ["フォレシス"], "stock": 0, "memo": ""}, {"id": 10045, "name": "FCU#200　約410mm×155mm", "category": "ファンコイル", "properties": ["タワーズ"], "stock": 18, "memo": ""}, {"id": 10046, "name": "FCU#300　約510mm×155mm", "category": "ファンコイル", "properties": ["タワーズ"], "stock": 50, "memo": ""}, {"id": 10047, "name": "FCUリモコン本体/BRC315C1", "category": "ファンコイル", "properties": ["タワーズ", "ブリリア"], "stock": 9, "memo": "ブリリアと同じ、本体のみ交換可"}, {"id": 10048, "name": "二方弁電動バルブ61FBW-1R-08-20", "category": "ファンコイル", "properties": ["タワーズ", "ブリリア"], "stock": 6, "memo": "ブリリアと同じ"}, {"id": 10049, "name": "FCUファンモーター", "category": "ファンコイル", "properties": ["タワーズ"], "stock": 5, "memo": "モーター番号：10SA-10"}, {"id": 10050, "name": "エアフィルター＃200(478×235)", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 11, "memo": ""}, {"id": 10051, "name": "エアフィルター＃300(576×235)", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 11, "memo": ""}, {"id": 10052, "name": "エアフィルター＃400(678×235)", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 22, "memo": ""}, {"id": 10053, "name": "エアフィルター＃600(898×235)", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 13, "memo": ""}, {"id": 10054, "name": "エアフィルター＃800(1371×235)", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 22, "memo": ""}, {"id": 10055, "name": "エアフィルター特注1(508×63)", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 9, "memo": ""}, {"id": 10056, "name": "エアフィルター特注1(363×108)", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 10, "memo": ""}, {"id": 10057, "name": "エアフィルター特注1(463×108)", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 2, "memo": ""}, {"id": 10058, "name": "エアフィルター特注1(513×156)", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 10, "memo": ""}, {"id": 10059, "name": "エアフィルター特注1(263×158)", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 0, "memo": ""}, {"id": 10060, "name": "エアフィルター特注1(213×208)", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 2, "memo": ""}, {"id": 10061, "name": "エアフィルター特注2(663×108)", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 9, "memo": ""}, {"id": 10062, "name": "エアフィルター特注2(708×63)", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 1, "memo": ""}, {"id": 10063, "name": "エアフィルター特注2(708×158)", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 0, "memo": ""}, {"id": 10064, "name": "エアフィルター特注2(963×108)", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 2, "memo": ""}, {"id": 10065, "name": "エアフィルター特注2(963×158)", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 0, "memo": "2026/03/26 ない？"}, {"id": 10066, "name": "エアフィルター特注2(1313×108)", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 2, "memo": ""}, {"id": 10067, "name": "ファン", "category": "ファンコイル", "properties": ["ブリリア"], "stock": 4, "memo": ""}, {"id": 10068, "name": "エアフィルター＃200", "category": "ファンコイル", "properties": ["ブランズ"], "stock": 5, "memo": ""}, {"id": 10069, "name": "エアフィルター＃300", "category": "ファンコイル", "properties": ["ブランズ"], "stock": 25, "memo": "＃800(＃400＋＃300)"}, {"id": 10070, "name": "エアフィルター＃400", "category": "ファンコイル", "properties": ["ブランズ"], "stock": 10, "memo": "＃800(＃400＋＃300)"}, {"id": 10071, "name": "エアフィルター＃600", "category": "ファンコイル", "properties": ["ブランズ"], "stock": 4, "memo": ""}, {"id": 10072, "name": "ファンコイルモーターFWHC４CHR/ 2338129", "category": "ファンコイル", "properties": ["ブランズ"], "stock": 5, "memo": ""}, {"id": 10073, "name": "ファンモーター/61A00607", "category": "ファンコイル", "properties": ["ブリリアタワーズ目黒"], "stock": 2, "memo": ""}, {"id": 10074, "name": "ファンコイルモーター(ファン電動機)M18644316", "category": "ファンコイル", "properties": ["ブリリアタワーズ目黒"], "stock": 5, "memo": ""}, {"id": 10075, "name": "アレルゲンHEPAフィルター", "category": "エアコン", "properties": ["ナビューレ"], "stock": 27, "memo": "2個1セット（袋入り）"}, {"id": 10076, "name": "MLZ-RX28・56RAS用ファンモーター", "category": "エアコン", "properties": ["ナビューレ"], "stock": 2, "memo": "ファンモーター/M21 L9V 300 51A09\n28RAS・56RAS兼用"}, {"id": 10077, "name": "フィレドン　PS-300（120×450）", "category": "エアコン", "properties": ["ナビューレ"], "stock": 14, "memo": ""}, {"id": 10078, "name": "エアコンリモコン/M21EG0426", "category": "エアコン", "properties": ["ナビューレ"], "stock": 0, "memo": "MLZ-225AS、MLZ-22RAS、MLZ-25RAS、MLZ-RX22RAS、MLZ-RX25RAS、MLZ-RX28RAS、MLZ-RX36RAS、MLZ-RX40RAS、MLZ-RX50RAS、MLZ-RX56RAS"}, {"id": 10079, "name": "バス乾燥機フィルター長 末尾008", "category": "浴室", "properties": ["フォレシス"], "stock": 26, "memo": ""}, {"id": 10080, "name": "バス乾燥機フィルター短 末尾004", "category": "浴室", "properties": ["フォレシス", "タワーズ"], "stock": 13, "memo": "タワーズと同じ"}, {"id": 10081, "name": "追焚配管用薬剤", "category": "浴室", "properties": ["全て"], "stock": 0, "memo": "発注は5セットずつのみ可"}, {"id": 10082, "name": "キッチン給気フィルター約20cm×20cm", "category": "キッチン", "properties": ["フォレシス"], "stock": 17, "memo": "PS-600 230×230枠付き"}, {"id": 10083, "name": "レンジフード用グリスフィルター3枚１組ネジ付き", "category": "キッチン", "properties": ["フォレシス", "タワーズ"], "stock": 2, "memo": "ネジ付3・無4　在庫３販売後はネジ無"}, {"id": 10084, "name": "浄水器カートリッジ", "category": "キッチン", "properties": ["フォレシス", "タワーズ"], "stock": 322, "memo": "内事務ストック3"}, {"id": 10085, "name": "レンジフード用ダンパーモータ", "category": "キッチン", "properties": ["フォレシス"], "stock": 5, "memo": "FMSR-2"}, {"id": 10086, "name": "レンジフード用ファンモータ", "category": "キッチン", "properties": ["フォレシス"], "stock": 6, "memo": "VFB-SE4PMX用"}, {"id": 10087, "name": "キッチンファン", "category": "キッチン", "properties": ["フォレシス"], "stock": 2, "memo": ""}, {"id": 10088, "name": "ﾚﾝｼﾞﾌｰﾄﾞ操作ｽｲｯﾁ　ﾀｲﾌﾟX", "category": "キッチン", "properties": ["フォレシス"], "stock": 3, "memo": ""}, {"id": 10089, "name": "キッチン給気フィルター（黒)", "category": "キッチン", "properties": ["タワーズ"], "stock": 26, "memo": ""}, {"id": 10090, "name": "キッチン給気フィルター（白）", "category": "キッチン", "properties": ["タワーズ"], "stock": 29, "memo": "FC620N 225×225"}, {"id": 10091, "name": "レンジフード用フィルター（3枚1ｾｯﾄ）", "category": "キッチン", "properties": ["タワーズ"], "stock": 30, "memo": "在庫はｾｯﾄ数"}, {"id": 10092, "name": "レンジフード用フィルター枠（ｱｲﾎﾞﾘｰ）", "category": "キッチン", "properties": ["タワーズ"], "stock": 1, "memo": ""}, {"id": 10093, "name": "キッチン給排気グリル", "category": "キッチン", "properties": ["タワーズ"], "stock": 0, "memo": "P-23GLF4　現行品：P-23GLF6"}, {"id": 10094, "name": "キッチン給気フィルター", "category": "キッチン", "properties": ["ナビューレ"], "stock": 0, "memo": ""}, {"id": 10095, "name": "レンジフード用グリスフィルター/CSF17-4861", "category": "キッチン", "properties": ["ナビューレ"], "stock": 17, "memo": ""}, {"id": 10096, "name": "排気ダンパーリング", "category": "キッチン", "properties": ["ナビューレ"], "stock": 3, "memo": ""}, {"id": 10097, "name": "グリスフィルター/SGF−611NRH", "category": "キッチン", "properties": ["ブリリア"], "stock": 5, "memo": "109R5200"}, {"id": 10098, "name": "グリスフィルター　CSF16-4001", "category": "キッチン", "properties": ["ブリリア"], "stock": 1, "memo": ""}];
+const items = ITEMS_DATA.map(i => ({...i, properties: [...i.properties], minStock: 0, orderStatus: '', carStock: 0}));
+const logs = [];
+let categories = ["エアコン", "キッチン", "ファンコイル", "ロスナイ", "換気設備", "浴室"];
+let allProperties = ["タワーズ", "ナビューレ", "フォレシス", "ブランズ", "ブリリア", "ブリリアタワーズ目黒"];
+let staffList = ["スタッフA", "スタッフB", "スタッフC", "スタッフD", "スタッフE", "スタッフF", "スタッフG"];
+let activeCat = 'すべて';
+let activeProp = 'すべて';
+let currentId = null;
+let currentIOType = null;
+let formMode = 'add';
+let masterMode = { type: null, index: -1 };
+let nextId = 10099;
+
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(el => {
+    el.classList.toggle('active', el.getAttribute('onclick') === `showPage('${page}')`);
+  });
+  document.querySelectorAll('.sp-nav-item').forEach(el => {
+    el.classList.toggle('active', el.getAttribute('onclick') === `showPage('${page}')`);
+  });
+  if (page === 'car') renderCar();
+  if (page === 'log') renderLogs();
+  if (page === 'categories') renderCategories();
+  if (page === 'properties') renderProperties();
+  if (page === 'staff') renderStaff();
+  if (page === 'stocktake') renderStocktake();
+}
+
+function now() {
+  const d = new Date();
+  const jst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  return `${jst.getUTCFullYear()}/${String(jst.getUTCMonth()+1).padStart(2,'0')}/${String(jst.getUTCDate()).padStart(2,'0')} ${String(jst.getUTCHours()).padStart(2,'0')}:${String(jst.getUTCMinutes()).padStart(2,'0')}`;
+}
+
+function buildFilters() {
+  const cats = ['すべて', ...categories];
+  document.getElementById('cat-chips').innerHTML = cats.map(c =>
+    `<button class="chip ${c===activeCat?'active':''}" onclick="setCat('${c}')">${c}</button>`
+  ).join('');
+  const propBase = items.filter(i => activeCat==='すべて' || i.category===activeCat).flatMap(i => i.properties);
+  const props = ['すべて', ...new Set(propBase)];
+  if (!props.includes(activeProp)) activeProp = 'すべて';
+  document.getElementById('prop-chips').innerHTML = props.map(p =>
+    `<button class="chip ${p===activeProp?'active':''}" onclick="setProp('${p}')">${p}</button>`
+  ).join('');
+}
+
+function setCat(cat) { activeCat = cat; activeProp = 'すべて'; buildFilters(); renderItems(); }
+function setProp(prop) { activeProp = prop; buildFilters(); renderItems(); }
+
+let filterZeroOnly = false;
+let filterAlertOnly = false;
+let stocktakeActiveCat = 'すべて';
+
+function toggleZeroFilter() {
+  filterZeroOnly = !filterZeroOnly;
+  filterAlertOnly = false;
+  const card = document.getElementById('zero-card');
+  card.style.background = filterZeroOnly ? '#fde8e8' : '';
+  card.style.borderColor = filterZeroOnly ? '#f0c0c0' : '';
+  document.getElementById('alert-card').style.background = '';
+  document.getElementById('alert-card').style.borderColor = '';
+  renderItems();
+}
+
+function toggleAlertFilter() {
+  filterAlertOnly = !filterAlertOnly;
+  filterZeroOnly = false;
+  const card = document.getElementById('alert-card');
+  card.style.background = filterAlertOnly ? '#fef3e2' : '';
+  card.style.borderColor = filterAlertOnly ? '#ffcc80' : '';
+  document.getElementById('zero-card').style.background = '';
+  document.getElementById('zero-card').style.borderColor = '';
+  renderItems();
+}
+
+function setOrderStatus(itemId, status) {
+  const item = items.find(i => i.id === itemId);
+  item.orderStatus = item.orderStatus === status ? '' : status;
+  renderItems();
+}
+
+function renderItems() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const filtered = items.filter(i => {
+    const matchCat = activeCat==='すべて' || i.category===activeCat;
+    const matchProp = activeProp==='すべて' || i.properties.includes(activeProp);
+    const matchQ = !q || i.name.toLowerCase().includes(q) || String(i.id).includes(q);
+    const matchZero = !filterZeroOnly || i.stock===0;
+    const matchAlert = !filterAlertOnly || (i.minStock > 0 && i.stock <= i.minStock && i.stock > 0);
+    return matchCat && matchProp && matchQ && matchZero && matchAlert;
+  });
+  document.getElementById('total-items').textContent = items.length;
+  document.getElementById('zero-items').textContent = items.filter(i => i.stock===0).length;
+  document.getElementById('alert-items').textContent = items.filter(i => i.minStock > 0 && i.stock > 0 && i.stock <= i.minStock).length;
+  document.getElementById('cat-count').textContent = categories.length;
+  document.getElementById('last-updated').textContent = '最終更新：' + now();
+  const list = document.getElementById('item-list');
+  if (filtered.length===0) { list.innerHTML = '<div class="empty">該当する品目がありません</div>'; return; }
+  list.innerHTML = filtered.map(item => {
+    const total = item.stock + item.carStock;
+    const isZero = total === 0;
+    const isAlert = item.minStock > 0 && item.stock > 0 && item.stock <= item.minStock;
+    const propTags = item.properties.map(p => `<span class="tag tag-prop">${p}</span>`).join('');
+    const memoHtml = item.memo ? `<div class="item-memo">${item.memo}</div>` : '';
+    const statusTag = item.orderStatus === 'ordered'
+      ? `<span class="tag tag-ordered">発注済み</span>`
+      : item.orderStatus === 'waiting'
+      ? `<span class="tag tag-waiting">入荷待ち</span>` : '';
+    const orderBtns = (item.stock===0 || isAlert) ? `
+      <div class="order-btn-group">
+        <button class="order-btn ${item.orderStatus==='ordered'?'active-ordered':''}" onclick="setOrderStatus(${item.id},'ordered')">発注済み</button>
+        <button class="order-btn ${item.orderStatus==='waiting'?'active-waiting':''}" onclick="setOrderStatus(${item.id},'waiting')">入荷待ち</button>
+      </div>` : '';
+    const stockRow = `
+      <div class="car-stock-row">
+        <div class="car-stock-item">倉庫<span>${item.stock}</span></div>
+        <div class="car-stock-item">車載中<span class="in-car">${item.carStock}</span></div>
+      </div>`;
+    return `<div class="item-card">
+      <div class="item-header">
+        <div style="flex:1;min-width:0"><div class="item-name">${item.name}</div><div class="item-id">ID: ${item.id}</div></div>
+        <div class="item-stock">
+          <div class="stock-num ${isZero?'stock-zero':''}" style="${isAlert&&item.stock>0?'color:#e67e22':''}">${total}</div>
+          <div class="stock-unit">合計</div>
+        </div>
+      </div>
+      <div class="item-tags">
+        <span class="tag tag-cat">${item.category}</span>${propTags}
+        <span class="tag ${isZero?'tag-zero':isAlert?'tag-alert':'tag-ok'}">${isZero?'在庫ゼロ':isAlert?'在庫少':'在庫あり'}</span>
+        ${item.carStock>0?'<span class="tag" style="background:#e8f0fe;color:#1a5dc8">車載中 '+item.carStock+'</span>':''}
+        ${statusTag}
+      </div>
+      ${stockRow}
+      ${memoHtml}
+      ${orderBtns}
+      <div class="item-actions">
+        <button onclick="openIO(${item.id},'in')">入庫 ＋</button>
+        <button onclick="openIO(${item.id},'out')">出庫 －</button>
+        <button class="btn-edit" onclick="openEdit(${item.id})">編集</button>
+        <button class="btn-del" onclick="doDelete(${item.id})">削除</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+let logTypeFilter = 'all';
+let logStaffFilter = 'すべて';
+
+function setLogType(type) {
+  logTypeFilter = type;
+  ['all','in','out'].forEach(t => {
+    document.getElementById('log-filter-' + t)?.classList.toggle('active', t === type);
+  });
+  renderLogs();
+}
+
+function setLogStaff(staff) {
+  logStaffFilter = staff;
+  renderLogs();
+  buildLogStaffChips();
+}
+
+function buildLogStaffChips() {
+  const staffInLogs = ['すべて', ...new Set(logs.map(l => l.staff))];
+  const el = document.getElementById('log-staff-chips');
+  if (el) el.innerHTML = staffInLogs.map(s =>
+    `<button class="chip ${s===logStaffFilter?'active':''}" onclick="setLogStaff('${s}')">${s}</button>`
+  ).join('');
+}
+
+function renderLogs() {
+  buildLogStaffChips();
+  const q = (document.getElementById('log-search')?.value || '').toLowerCase();
+  const tbody = document.getElementById('log-body');
+  const filtered = logs.filter(l => {
+    const matchType = logTypeFilter === 'all' || l.type === logTypeFilter;
+    const matchStaff = logStaffFilter === 'すべて' || l.staff === logStaffFilter;
+    const matchQ = !q || l.itemName.toLowerCase().includes(q);
+    return matchType && matchStaff && matchQ;
+  });
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px;color:#aaa">該当する履歴がありません</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.slice().reverse().map(l => {
+    const isIn = l.type==='in';
+    return `<tr><td>${l.date}</td><td>${l.itemName}</td><td>${isIn?'入庫':'出庫'}</td><td class="${isIn?'log-plus':'log-minus'}">${isIn?'+':'-'}${l.qty}</td><td>${l.staff}</td><td style="color:#888;font-size:12px">${l.note||''}</td></tr>`;
+  }).join('');
+}
+
+function renderMasterList(type) {
+  const isCategory = type === 'category';
+  const isStaff = type === 'staff';
+  const listId = isCategory ? 'category-list' : isStaff ? 'staff-list' : 'property-list';
+  const data = isCategory ? categories : isStaff ? staffList : allProperties;
+  const el = document.getElementById(listId);
+  const label = isCategory ? '設備種類' : isStaff ? 'スタッフ' : '物件名';
+  if (!data.length) { el.innerHTML = `<div class="empty-master">${label}がありません</div>`; return; }
+  el.innerHTML = data.map((name, i) => {
+    const countText = isStaff
+      ? `履歴 ${logs.filter(l => l.staff === name).length}件`
+      : isCategory
+        ? `品目 ${items.filter(item => item.category === name).length}件`
+        : `品目 ${items.filter(item => item.properties.includes(name)).length}件`;
+    return `<div class="master-item" draggable="true" data-index="${i}" data-type="${type}">
+      <div class="master-item-left">
+        <span class="drag-handle" title="ドラッグで並び替え">⠿</span>
+        <div><div class="master-item-name">${name}</div><div class="master-item-count">${countText}</div></div>
+      </div>
+      <div class="master-item-actions">
+        <button class="btn-sm" onclick="openEditMaster('${type}',${i})">編集</button>
+        <button class="btn-sm btn-sm-danger" onclick="deleteMaster('${type}',${i})">削除</button>
+      </div>
+    </div>`;
+  }).join('');
+  setupDragSort(listId, type);
+}
+
+function renderCategories() { renderMasterList('category'); }
+function renderProperties() { renderMasterList('property'); }
+function renderStaff() { renderMasterList('staff'); }
+
+function setupDragSort(listId, type) {
+  const list = document.getElementById(listId);
+  let dragSrcIndex = null;
+  let touchDragEl = null;
+  let touchDragIndex = null;
+  let touchClone = null;
+
+  list.querySelectorAll('.master-item').forEach(item => {
+    // PC: drag & drop
+    item.addEventListener('dragstart', e => {
+      dragSrcIndex = parseInt(item.dataset.index);
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    item.addEventListener('dragend', () => item.classList.remove('dragging'));
+    item.addEventListener('dragover', e => {
+      e.preventDefault();
+      list.querySelectorAll('.master-item').forEach(el => el.classList.remove('drag-over'));
+      item.classList.add('drag-over');
+    });
+    item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
+    item.addEventListener('drop', e => {
+      e.preventDefault();
+      item.classList.remove('drag-over');
+      const targetIndex = parseInt(item.dataset.index);
+      if (dragSrcIndex === null || dragSrcIndex === targetIndex) return;
+      const data = type === 'category' ? categories : type === 'staff' ? staffList : allProperties;
+      const [moved] = data.splice(dragSrcIndex, 1);
+      data.splice(targetIndex, 0, moved);
+      dragSrcIndex = null;
+      renderMasterList(type);
+      buildFilters();
+    });
+
+    // スマホ: touch
+    const handle = item.querySelector('.drag-handle');
+    handle.addEventListener('touchstart', e => {
+      touchDragIndex = parseInt(item.dataset.index);
+      touchDragEl = item;
+      touchClone = item.cloneNode(true);
+      touchClone.style.cssText = `position:fixed;z-index:999;opacity:0.85;width:${item.offsetWidth}px;pointer-events:none;background:#fff;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,0.15);`;
+      document.body.appendChild(touchClone);
+      item.classList.add('dragging');
+      e.preventDefault();
+    }, { passive: false });
+
+    handle.addEventListener('touchmove', e => {
+      if (!touchClone) return;
+      const touch = e.touches[0];
+      touchClone.style.left = (touch.clientX - touchClone.offsetWidth / 2) + 'px';
+      touchClone.style.top = (touch.clientY - 30) + 'px';
+      list.querySelectorAll('.master-item').forEach(el => el.classList.remove('drag-over'));
+      const over = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.master-item');
+      if (over) over.classList.add('drag-over');
+      e.preventDefault();
+    }, { passive: false });
+
+    handle.addEventListener('touchend', e => {
+      if (!touchClone) return;
+      const touch = e.changedTouches[0];
+      const over = document.elementFromPoint(touch.clientX, touch.clientY)?.closest('.master-item');
+      if (over) {
+        const targetIndex = parseInt(over.dataset.index);
+        if (touchDragIndex !== targetIndex) {
+          const data = type === 'category' ? categories : type === 'staff' ? staffList : allProperties;
+          const [moved] = data.splice(touchDragIndex, 1);
+          data.splice(targetIndex, 0, moved);
+          buildFilters();
+        }
+        over.classList.remove('drag-over');
+      }
+      touchClone.remove(); touchClone = null;
+      if (touchDragEl) touchDragEl.classList.remove('dragging');
+      touchDragEl = null; touchDragIndex = null;
+      renderMasterList(type);
+    });
+  });
+}
+
+function openAddMaster(type) {
+  masterMode = { type, index: -1 };
+  const labels = { category: ['設備種類を追加', '設備種類名'], property: ['物件名を追加', '物件名'], staff: ['スタッフを追加', 'スタッフ名'] };
+  document.getElementById('modal-master-title').textContent = labels[type][0];
+  document.getElementById('modal-master-label').textContent = labels[type][1];
+  document.getElementById('master-input').value = '';
+  document.getElementById('master-actions').innerHTML = `
+    <button onclick="closeAll()">キャンセル</button>
+    <button class="confirm" onclick="saveMaster()">追加</button>`;
+  document.getElementById('modal-master').classList.add('open');
+  setTimeout(() => document.getElementById('master-input').focus(), 100);
+}
+
+function openEditMaster(type, index) {
+  masterMode = { type, index };
+  const data = type === 'category' ? categories : type === 'staff' ? staffList : allProperties;
+  const labels = { category: ['設備種類を編集', '設備種類名'], property: ['物件名を編集', '物件名'], staff: ['スタッフを編集', 'スタッフ名'] };
+  document.getElementById('modal-master-title').textContent = labels[type][0];
+  document.getElementById('modal-master-label').textContent = labels[type][1];
+  document.getElementById('master-input').value = data[index];
+  document.getElementById('master-actions').innerHTML = `
+    <button onclick="closeAll()">キャンセル</button>
+    <button class="confirm" onclick="saveMaster()">保存</button>`;
+  document.getElementById('modal-master').classList.add('open');
+}
+
+function saveMaster() {
+  const val = document.getElementById('master-input').value.trim();
+  if (!val) { alert('名前を入力してください'); return; }
+  const { type, index } = masterMode;
+  const data = type === 'category' ? categories : type === 'staff' ? staffList : allProperties;
+  if (index === -1) {
+    if (data.includes(val)) { alert('すでに存在します'); return; }
+    data.push(val);
+  } else {
+    const old = data[index];
+    data[index] = val;
+    if (type === 'category') items.forEach(i => { if (i.category===old) i.category = val; });
+    else if (type === 'property') items.forEach(i => { i.properties = i.properties.map(p => p===old ? val : p); });
+    else if (type === 'staff') logs.forEach(l => { if (l.staff===old) l.staff = val; });
+  }
+  closeAll();
+  buildFilters();
+  renderItems();
+  if (type==='category') renderCategories();
+  else if (type==='property') renderProperties();
+  else {
+    renderStaff();
+    if (gasConnected) gasPost({ action: 'saveStaff', staffList }).catch(() => showToast('⚠️ スタッフ保存に失敗しました', true));
+  }
+}
+
+function deleteMaster(type, index) {
+  const data = type === 'category' ? categories : type === 'staff' ? staffList : allProperties;
+  const name = data[index];
+  const typeLabel = type === 'category' ? '設備種類' : type === 'staff' ? 'スタッフ' : '物件名';
+  const count = type === 'staff'
+    ? logs.filter(l => l.staff === name).length
+    : type === 'category'
+      ? items.filter(i => i.category === name).length
+      : items.filter(i => i.properties.includes(name)).length;
+  const warn = count > 0 ? `\n※この${typeLabel}は${count}件で使用中です。` : '';
+  if (!confirm(`「${name}」を削除しますか？${warn}`)) return;
+  data.splice(index, 1);
+  buildFilters();
+  if (type==='category') renderCategories();
+  else if (type==='property') renderProperties();
+  else {
+    renderStaff();
+    if (gasConnected) gasPost({ action: 'saveStaff', staffList }).catch(() => showToast('⚠️ スタッフ保存に失敗しました', true));
+  }
+}
+
+// 入庫・出庫
+// whoami（このデバイスの担当者設定）
+let currentUser = localStorage.getItem('whoami') || '';
+
+function updateWhoamiDisplay() {
+  const display = document.getElementById('whoami-display');
+  if (display) display.textContent = currentUser || '未設定';
+}
+
+function openWhoami() {
+  const sel = document.getElementById('whoami-select');
+  sel.innerHTML = staffList.map(s =>
+    `<option value="${s}" ${s===currentUser?'selected':''}>${s}</option>`
+  ).join('');
+  document.getElementById('modal-whoami').classList.add('open');
+}
+
+function saveWhoami() {
+  const val = document.getElementById('whoami-select').value;
+  currentUser = val;
+  localStorage.setItem('whoami', val);
+  updateWhoamiDisplay();
+  document.getElementById('modal-whoami').classList.remove('open');
+}
+
+function checkFirstVisit() {
+  if (!currentUser || !staffList.includes(currentUser)) {
+    openWhoami();
+  }
+}
+
+let currentIOSubType = 'warehouse'; // 'warehouse' or 'car'
+
+function setIOSubType(subType) {
+  currentIOSubType = subType;
+  document.getElementById('io-type-warehouse').classList.toggle('active-ordered', subType === 'warehouse');
+  document.getElementById('io-type-car').classList.toggle('active-ordered', subType === 'car');
+  const item = items.find(i => i.id===currentId);
+  updateStockHint(item);
+}
+
+function updateStockHint(item) {
+  const hint = document.getElementById('modal-stock-hint');
+  if (currentIOType === 'out') {
+    hint.textContent = `倉庫在庫：${item.stock}個　車載中：${item.carStock}個`;
+  } else {
+    if (currentIOSubType === 'car') {
+      hint.textContent = `車載中から入庫　車載中：${item.carStock}個`;
+    } else {
+      hint.textContent = `倉庫在庫：${item.stock}個`;
+    }
+  }
+}
+
+function openIO(itemId, type) {
+  currentId = itemId; currentIOType = type; currentIOSubType = type === 'out' ? 'car' : 'warehouse';
+  const item = items.find(i => i.id===itemId);
+  document.getElementById('modal-io-name').textContent = item.name;
+  document.getElementById('modal-io-title').textContent = type==='in' ? '入庫を記録' : '出庫を記録';
+  document.getElementById('modal-io-btn').textContent = type==='in' ? '入庫確定' : '出庫確定';
+  document.getElementById('modal-qty').value = 1;
+  document.getElementById('modal-staff-name').textContent = currentUser || 'スタッフ未設定';
+
+  // 出庫・入庫ともに種別選択を表示
+  const typeRow = document.getElementById('modal-type-row');
+  if (type === 'out') {
+    typeRow.style.display = '';
+    currentIOSubType = 'car';
+    document.getElementById('io-type-warehouse').textContent = '倉庫から出庫';
+    document.getElementById('io-type-car').textContent = '車に積込';
+    setIOSubType('car');
+  } else {
+    typeRow.style.display = '';
+    currentIOSubType = 'warehouse';
+    document.getElementById('io-type-warehouse').textContent = '倉庫に入庫';
+    document.getElementById('io-type-car').textContent = '車載から入庫';
+    setIOSubType('warehouse');
+  }
+  updateStockHint(item);
+  document.getElementById('modal-io').classList.add('open');
+}
+
+function confirmIO() {
+  const item = items.find(i => i.id===currentId);
+  const qty = parseInt(document.getElementById('modal-qty').value) || 1;
+  const staff = currentUser || 'スタッフ未設定';
+
+  if (currentIOType === 'out') {
+    if (currentIOSubType === 'car') {
+      if (item.stock < qty) { alert('倉庫の在庫数が不足しています'); return; }
+      item.stock -= qty;
+      item.carStock += qty;
+      logs.push({ itemId:item.id, itemName:item.name, type:'out', qty, staff, date:now(), note:'車に積込' });
+    } else {
+      if (item.stock < qty) { alert('倉庫の在庫数が不足しています'); return; }
+      item.stock -= qty;
+      logs.push({ itemId:item.id, itemName:item.name, type:'out', qty, staff, date:now(), note:'倉庫から出庫' });
+    }
+  } else {
+    // 入庫：車載からか倉庫への入庫か
+    if (currentIOSubType === 'car') {
+      // 車載 → 倉庫（車載在庫が減り、倉庫在庫が増える）
+      if (item.carStock < qty) { alert('車載中の在庫数が不足しています'); return; }
+      item.carStock -= qty;
+      item.stock += qty;
+      logs.push({ itemId:item.id, itemName:item.name, type:'in', qty, staff, date:now(), note:'車載から入庫（倉庫へ返却）' });
+    } else {
+      // 通常入庫（倉庫に追加）
+      item.stock += qty;
+      logs.push({ itemId:item.id, itemName:item.name, type:'in', qty, staff, date:now(), note:'入庫' });
+    }
+  }
+  closeAll(); renderItems();
+}
+
+function changeQty(delta) {
+  const input = document.getElementById('modal-qty');
+  input.value = Math.max(1, parseInt(input.value||1) + delta);
+}
+
+// 品目追加・編集
+function buildFormProps(selected) {
+  document.getElementById('form-prop-checks').innerHTML = allProperties.map(p => {
+    const checked = selected.includes(p);
+    return `<label class="prop-checkbox-label ${checked?'checked':''}" >
+      <input type="checkbox" value="${p}" ${checked?'checked':''} onchange="this.closest('label').classList.toggle('checked',this.checked)" />${p}
+    </label>`;
+  }).join('');
+}
+
+function buildFormCategory(selected) {
+  document.getElementById('form-category').innerHTML = categories.map(c =>
+    `<option value="${c}" ${c===selected?'selected':''}>${c}</option>`
+  ).join('');
+}
+
+function openAdd() {
+  formMode = 'add'; currentId = null;
+  document.getElementById('modal-form-title').textContent = '品目を追加';
+  document.getElementById('form-name').value = '';
+  buildFormCategory(categories[0]||'');
+  buildFormProps([]);
+  document.getElementById('form-stock').value = '0';
+  document.getElementById('form-minstock').value = '0';
+  document.getElementById('form-memo').value = '';
+  document.getElementById('form-actions').innerHTML = `
+    <button onclick="closeAll()">キャンセル</button>
+    <button class="confirm" onclick="saveForm()">追加</button>`;
+  document.getElementById('modal-form').classList.add('open');
+}
+
+function openEdit(itemId) {
+  formMode = 'edit'; currentId = itemId;
+  const item = items.find(i => i.id===itemId);
+  document.getElementById('modal-form-title').textContent = '品目を編集';
+  document.getElementById('form-name').value = item.name;
+  buildFormCategory(item.category);
+  buildFormProps(item.properties);
+  document.getElementById('form-stock').value = item.stock;
+  document.getElementById('form-minstock').value = item.minStock || 0;
+  document.getElementById('form-memo').value = item.memo;
+  document.getElementById('form-actions').innerHTML = `
+    <button class="danger" onclick="doDelete(${item.id},true)">削除</button>
+    <button onclick="closeAll()">キャンセル</button>
+    <button class="confirm" onclick="saveForm()">保存</button>`;
+  document.getElementById('modal-form').classList.add('open');
+}
+
+function saveForm() {
+  const name = document.getElementById('form-name').value.trim();
+  if (!name) { alert('品名を入力してください'); return; }
+  const category = document.getElementById('form-category').value;
+  const selectedProps = [...document.querySelectorAll('#form-prop-checks input:checked')].map(cb => cb.value);
+  if (!selectedProps.length) { alert('物件名を1つ以上選択してください'); return; }
+  const stock = parseInt(document.getElementById('form-stock').value)||0;
+  const minStock = parseInt(document.getElementById('form-minstock').value)||0;
+  const memo = document.getElementById('form-memo').value.trim();
+  if (formMode==='add') {
+    const newItem = { id: nextId++, name, category, properties: selectedProps, stock, minStock, memo, orderStatus: '', carStock: 0 };
+    items.push(newItem);
+    if (gasConnected) gasPost({ action: 'addItem', item: newItem }).catch(() => showToast('⚠️ 追加の同期に失敗しました', true));
+  } else {
+    Object.assign(items.find(i => i.id===currentId), { name, category, properties: selectedProps, stock, minStock, memo });
+    const updatedItem = items.find(i => i.id===currentId);
+    if (gasConnected) gasPost({ action: 'updateItem', item: updatedItem }).catch(() => showToast('⚠️ 更新の同期に失敗しました', true));
+  }
+  closeAll(); buildFilters(); renderItems();
+}
+
+// 車載在庫
+function returnFromCar(itemId) {
+  const item = items.find(i => i.id===itemId);
+  currentId = itemId; currentIOType = 'in'; currentIOSubType = 'car';
+  document.getElementById('modal-io-name').textContent = item.name;
+  document.getElementById('modal-io-title').textContent = '車から倉庫へ返却';
+  document.getElementById('modal-io-btn').textContent = '返却確定';
+  document.getElementById('modal-qty').value = 1;
+  document.getElementById('modal-staff-name').textContent = currentUser || 'スタッフ未設定';
+  document.getElementById('modal-type-row').style.display = 'none';
+  document.getElementById('modal-stock-hint').textContent = `車載中：${item.carStock}個`;
+  document.getElementById('modal-io').classList.add('open');
+}
+
+function renderCar() {
+  const carItems = items.filter(i => i.carStock > 0);
+  const totalCount = carItems.reduce((s, i) => s + i.carStock, 0);
+  document.getElementById('car-item-count').textContent = carItems.length;
+  document.getElementById('car-total-count').textContent = totalCount;
+  const list = document.getElementById('car-list');
+  if (carItems.length === 0) {
+    list.innerHTML = '<div style="background:#fff;border-radius:12px;border:1px solid #e8e8e8;padding:48px;text-align:center;color:#aaa;font-size:14px">現在車に積まれている部品はありません</div>';
+    return;
+  }
+  list.innerHTML = carItems.map(item => `
+    <div style="background:#fff;border-radius:12px;border:1px solid #e8e8e8;padding:16px;margin-bottom:10px">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600;margin-bottom:4px">${item.name}</div>
+          <div style="font-size:12px;color:#888">${item.category}　${item.properties.join('・')}</div>
+        </div>
+        <div style="text-align:center;flex-shrink:0">
+          <div style="font-size:26px;font-weight:700;color:#1a5dc8;line-height:1">${item.carStock}</div>
+          <div style="font-size:10px;color:#888">車載中</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:10px;border-top:1px solid #f0f0f0">
+        <div style="font-size:12px;color:#888">倉庫在庫：${item.stock}個</div>
+        <button onclick="returnFromCar(${item.id})" style="height:34px;padding:0 16px;border-radius:8px;border:1px solid #ddd;font-size:13px;cursor:pointer;background:#f5f5f5;white-space:nowrap">倉庫へ返却</button>
+      </div>
+    </div>`).join('');
+}
+
+// Airレジ売上CSV取込
+let airregiParsedData = [];
+
+function previewAirregiCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    let text = e.target.result;
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const lines = text.trim().split('\n').map(l => l.trim());
+    if (lines.length < 2) { alert('データが見つかりません'); return; }
+    const headers = parseCSVLine(lines[0]);
+    const codeCol = headers.indexOf('商品コード');
+    const nameCol = headers.indexOf('商品名');
+    const soldCol = headers.indexOf('販売商品数');
+    const returnCol = headers.indexOf('返品商品数');
+
+    if (codeCol === -1 || soldCol === -1) {
+      alert('Airレジの商品別売上CSVではないようです。確認してください。');
+      return;
+    }
+
+    airregiParsedData = [];
+    lines.slice(1).forEach(l => {
+      const cols = parseCSVLine(l);
+      const code = cols[codeCol]?.trim();
+      const name = cols[nameCol]?.trim();
+      const sold = parseInt(cols[soldCol]) || 0;
+      const returned = parseInt(cols[returnCol]) || 0;
+      const net = sold - returned;
+      if (code && net !== 0) {
+        const item = items.find(i => String(i.id) === code);
+        airregiParsedData.push({ code, name, sold, returned, net, matched: !!item, itemName: item ? item.name : '未マッチ' });
+      }
+    });
+
+    document.getElementById('airregi-preview-label').textContent =
+      `${airregiParsedData.length}件（マッチ：${airregiParsedData.filter(r=>r.matched).length}件　未マッチ：${airregiParsedData.filter(r=>!r.matched).length}件）`;
+
+    const table = document.getElementById('airregi-preview-table');
+    table.innerHTML = `<thead><tr><th>商品名（Airレジ）</th><th>システム品目名</th><th>販売数</th><th>返品数</th><th>差引</th></tr></thead>
+      <tbody>${airregiParsedData.map(r => `
+        <tr style="${!r.matched?'color:#c0392b':''}">
+          <td>${r.name}</td>
+          <td>${r.matched ? r.itemName : '⚠️ 未マッチ'}</td>
+          <td style="text-align:center">${r.sold}</td>
+          <td style="text-align:center">${r.returned}</td>
+          <td style="text-align:center;font-weight:600">${r.net}</td>
+        </tr>`).join('')}
+      </tbody>`;
+    document.getElementById('airregi-preview').style.display = '';
+  };
+  reader.readAsText(file, 'Shift-JIS');
+}
+
+function importAirregiCSV() {
+  if (!airregiParsedData.length) return;
+  const matched = airregiParsedData.filter(r => r.matched);
+  if (matched.length === 0) { alert('マッチする品目がありません'); return; }
+
+  const msg = matched.map(r => `・${r.itemName}：車載 -${r.net}`).join('\n');
+  if (!confirm(`以下の品目の車載在庫を更新します。\n\n${msg}`)) return;
+
+  const dateStr = now();
+  const staff = currentUser || 'Airレジ連携';
+  matched.forEach(async r => {
+    const item = items.find(i => String(i.id) === r.code);
+    if (!item) return;
+    const newCar = Math.max(0, item.carStock - r.net);
+    item.carStock = newCar;
+    const log = {
+      itemId: item.id, itemName: item.name,
+      type: 'out', qty: r.net, staff,
+      date: dateStr, note: `Airレジ売上CSV取込（販売${r.sold}件・返品${r.returned}件）`
+    };
+    logs.push(log);
+    if (gasConnected) {
+      await gasPost({ action: 'updateStock', id: item.id, stock: item.stock, carStock: item.carStock });
+      await gasPost({ action: 'addLog', log });
+    }
+  });
+
+  cancelAirregiCSV();
+  renderItems();
+  showToast(`✅ ${matched.length}件の車載在庫を更新しました`);
+}
+
+function cancelAirregiCSV() {
+  airregiParsedData = [];
+  document.getElementById('airregi-csv-input').value = '';
+  document.getElementById('airregi-preview').style.display = 'none';
+}
+
+// CSV管理
+let csvParsedData = [];
+
+function exportCSV() {
+  const header = ['ID', '品名', '設備種類', '物件名', '在庫数', '最低在庫数', '備考'];
+  const rows = items.map(i => [
+    i.id,
+    `"${i.name.replace(/"/g, '""')}"`,
+    `"${i.category.replace(/"/g, '""')}"`,
+    `"${i.properties.join('・').replace(/"/g, '""')}"`,
+    i.stock,
+    i.minStock || 0,
+    `"${(i.memo || '').replace(/"/g, '""')}"`
+  ]);
+  const csv = [header.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const bom = '\uFEFF';
+  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `在庫データ_${now().replace(/\//g,'-').replace(' ','_').replace(':','')}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function previewCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    let text = e.target.result;
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const lines = text.trim().split('\n').map(l => l.trim());
+    if (lines.length < 2) { alert('データが見つかりません'); return; }
+    const headers = parseCSVLine(lines[0]);
+    csvParsedData = lines.slice(1).map(l => {
+      const cols = parseCSVLine(l);
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = cols[i] || '');
+      return obj;
+    }).filter(r => r['ID']);
+
+    document.getElementById('csv-preview-label').textContent = `${csvParsedData.length}件のデータを確認しました`;
+    const table = document.getElementById('csv-preview-table');
+    table.innerHTML = `<thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
+      <tbody>${csvParsedData.slice(0, 10).map(row =>
+        `<tr>${headers.map(h => `<td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${row[h]||''}</td>`).join('')}</tr>`
+      ).join('')}${csvParsedData.length > 10 ? `<tr><td colspan="${headers.length}" style="text-align:center;color:#aaa">...他${csvParsedData.length - 10}件</td></tr>` : ''}
+      </tbody>`;
+    document.getElementById('csv-preview').style.display = '';
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let cur = '', inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQuote && line[i+1] === '"') { cur += '"'; i++; }
+      else inQuote = !inQuote;
+    } else if (c === ',' && !inQuote) {
+      result.push(cur); cur = '';
+    } else cur += c;
+  }
+  result.push(cur);
+  return result;
+}
+
+function importCSV() {
+  if (!csvParsedData.length) return;
+  let updated = 0, added = 0;
+  csvParsedData.forEach(row => {
+    const id = parseInt(row['ID']);
+    const stock = parseInt(row['在庫数']) || 0;
+    const minStock = parseInt(row['最低在庫数']) || 0;
+    const name = row['品名'] || '';
+    const category = row['設備種類'] || '';
+    const properties = row['物件名'] ? row['物件名'].split('・').filter(Boolean) : ['全て'];
+    const memo = row['備考'] || '';
+    const existing = items.find(i => i.id === id);
+    if (existing) {
+      Object.assign(existing, { name, category, properties, stock, minStock, memo });
+      updated++;
+    } else {
+      items.push({ id, name, category, properties, stock, minStock, memo, orderStatus: '' });
+      added++;
+      if (id >= nextId) nextId = id + 1;
+    }
+  });
+  cancelCSV();
+  buildFilters();
+  renderItems();
+  alert(`インポート完了\n更新：${updated}件　追加：${added}件`);
+}
+
+function cancelCSV() {
+  csvParsedData = [];
+  document.getElementById('csv-file-input').value = '';
+  document.getElementById('csv-preview').style.display = 'none';
+}
+
+function renderStocktake() {
+  const cats = ['すべて', ...categories];
+  document.getElementById('stocktake-cat-chips').innerHTML = cats.map(c =>
+    `<button class="chip ${c===stocktakeActiveCat?'active':''}" onclick="setStocktakeCat('${c}')">${c}</button>`
+  ).join('');
+  const filtered = items.filter(i => stocktakeActiveCat==='すべて' || i.category===stocktakeActiveCat);
+  document.getElementById('stocktake-list').innerHTML = `<table class="stocktake-table">
+    <thead><tr><th>品名</th><th>設備種類</th><th>現在庫</th><th>実数入力</th></tr></thead>
+    <tbody>${filtered.map(item => `
+      <tr id="st-row-${item.id}">
+        <td>${item.name}</td>
+        <td>${item.category}</td>
+        <td style="text-align:center;font-weight:600">${item.stock}</td>
+        <td style="text-align:center"><input type="number" inputmode="numeric" min="0" placeholder="${item.stock}" id="st-input-${item.id}" oninput="highlightStocktakeRow(${item.id})" /></td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+function setStocktakeCat(cat) {
+  stocktakeActiveCat = cat;
+  renderStocktake();
+}
+
+function highlightStocktakeRow(itemId) {
+  const input = document.getElementById(`st-input-${itemId}`);
+  const row = document.getElementById(`st-row-${itemId}`);
+  const item = items.find(i => i.id===itemId);
+  row.classList.toggle('stocktake-changed', input.value !== '' && parseInt(input.value) !== item.stock);
+}
+
+function applyStocktake() {
+  const changed = [];
+  items.forEach(item => {
+    const input = document.getElementById(`st-input-${item.id}`);
+    if (!input || input.value === '') return;
+    const newVal = parseInt(input.value);
+    if (newVal !== item.stock) {
+      changed.push({ id: item.id, name: item.name, old: item.stock, newVal });
+    }
+  });
+  if (changed.length === 0) { alert('変更された数量はありません'); return; }
+  const msg = changed.map(c => `・${c.name}：${c.old} → ${c.newVal}`).join('\n');
+  if (!confirm(`以下の品目を更新します。\n\n${msg}`)) return;
+
+  // 先にitemsを更新
+  changed.forEach(c => {
+    const item = items.find(i => i.id === c.id);
+    if (item) item.stock = c.newVal;
+  });
+
+  renderStocktake();
+  renderItems();
+  alert(`${changed.length}件の在庫数を更新しました`);
+
+  // スプレッドシートに保存
+  if (gasConnected) {
+    const dateStr = now();
+    const staff = currentUser || 'スタッフ未設定';
+    changed.forEach(async c => {
+      const item = items.find(i => i.id === c.id);
+      const log = {
+        itemId: c.id,
+        itemName: c.name,
+        type: 'in',
+        qty: c.newVal,
+        staff,
+        date: dateStr,
+        note: `棚卸し（${c.old}→${c.newVal}）`
+      };
+      await gasPost({ action: 'updateStock', id: c.id, stock: c.newVal, carStock: item.carStock });
+      await gasPost({ action: 'addLog', log });
+      logs.push(log);
+    });
+    showToast('✅ 棚卸し結果を保存しました');
+  }
+}
+
+function doDelete(itemId, fromModal=false) {
+  const item = items.find(i => i.id===itemId);
+  if (!confirm(`「${item.name}」を削除しますか？`)) return;
+  items.splice(items.findIndex(i => i.id===itemId), 1);
+  if (fromModal) closeAll();
+  buildFilters(); renderItems();
+  // GASに削除を反映
+  if (gasConnected) gasPost({ action: 'deleteItem', id: itemId }).catch(() => showToast('⚠️ 削除の同期に失敗しました', true));
+}
+
+function closeAll() {
+  ['modal-io','modal-form','modal-master'].forEach(id => document.getElementById(id).classList.remove('open'));
+}
+
+['modal-io','modal-form','modal-master'].forEach(id => {
+  document.getElementById(id).addEventListener('click', function(e) { if (e.target===this) closeAll(); });
+});
+
+// ========================================
+// GAS連携
+// ========================================
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwzF7O5PPWC_1kNURZb3Qttj8bmoOgZ3CZjZzt9ZQaVW58y-G0kr2Bxbyz3Py-im58POw/exec';
+let gasConnected = false;
+
+async function gasGet(action) {
+  const res = await fetch(`${GAS_URL}?action=${action}`);
+  return await res.json();
+}
+
+async function gasPost(data) {
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+  return await res.json();
+}
+
+// 起動時にスプレッドシートからデータを読み込む
+async function loadFromSheet() {
+  try {
+    showLoadingOverlay('データを読み込み中...');
+    const result = await gasGet('getItems');
+    if (result.items && result.items.length > 0) {
+      // スプレッドシートのデータでitemsを上書き
+      items.length = 0;
+      result.items.forEach(i => {
+        items.push({
+          id: parseInt(i.id),
+          name: i.name,
+          category: i.category,
+          properties: Array.isArray(i.properties) ? i.properties : [i.properties],
+          stock: parseInt(i.stock) || 0,
+          carStock: parseInt(i.carStock) || 0,
+          minStock: parseInt(i.minStock) || 0,
+          orderStatus: i.orderStatus || '',
+          memo: i.memo || ''
+        });
+      });
+      gasConnected = true;
+      showToast('✅ データを読み込みました');
+    } else {
+      // スプレッドシートが空なら現在のデータを初期アップロード
+      await gasPost({ action: 'initItems', items });
+      gasConnected = true;
+      showToast('✅ スプレッドシートにデータを保存しました');
+    }
+
+    // ログも読み込む
+    const logResult = await gasGet('getLogs');
+    logs.length = 0;
+    if (logResult.logs && logResult.logs.length > 0) {
+      logResult.logs.forEach(l => logs.push({
+        itemId: l.itemId,
+        itemName: l.itemName,
+        type: l.type,
+        qty: parseInt(l.qty) || 0,
+        staff: l.staff,
+        date: l.date,
+        note: l.note || ''
+      }));
+    }
+
+    // スタッフ読み込む
+    const staffResult = await gasGet('getStaff');
+    if (staffResult.staff && staffResult.staff.length > 0) {
+      staffList.length = 0;
+      staffResult.staff.forEach(s => { if (s.trim()) staffList.push(s.trim()); });
+    } else if (staffList.length > 0) {
+      // 初回：現在のスタッフリストをスプレッドシートに保存
+      await gasPost({ action: 'saveStaff', staffList });
+    }
+  } catch (e) {
+    showToast('⚠️ オフラインモードで起動しました', true);
+  } finally {
+    hideLoadingOverlay();
+    buildFilters();
+    renderItems();
+    updateWhoamiDisplay();
+    checkFirstVisit();
+  }
+}
+
+// 入出庫時にスプレッドシートに保存
+async function saveToSheet(itemId, log) {
+  if (!gasConnected) return;
+  try {
+    const item = items.find(i => i.id === itemId);
+    await Promise.all([
+      gasPost({ action: 'updateStock', id: itemId, stock: item.stock, carStock: item.carStock }),
+      gasPost({ action: 'addLog', log })
+    ]);
+  } catch (e) {
+    showToast('⚠️ 保存に失敗しました。再度お試しください', true);
+  }
+}
+
+// ローディングオーバーレイ
+function showLoadingOverlay(msg) {
+  let el = document.getElementById('loading-overlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'loading-overlay';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;z-index:999;font-size:16px;color:#555;flex-direction:column;gap:12px';
+    el.innerHTML = '<div style="width:32px;height:32px;border:3px solid #ddd;border-top-color:#1a1a1a;border-radius:50%;animation:spin 0.8s linear infinite"></div><div id="loading-msg"></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
+    document.body.appendChild(el);
+  }
+  document.getElementById('loading-msg').textContent = msg;
+  el.style.display = 'flex';
+}
+
+function hideLoadingOverlay() {
+  const el = document.getElementById('loading-overlay');
+  if (el) el.style.display = 'none';
+}
+
+// トースト通知
+function showToast(msg, isError = false) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast';
+    el.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 20px;border-radius:10px;font-size:14px;color:#fff;z-index:999;transition:opacity 0.3s;pointer-events:none';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.background = isError ? '#c0392b' : '#1a1a1a';
+  el.style.opacity = '1';
+  setTimeout(() => el.style.opacity = '0', 3000);
+}
+
+// confirmIOにスプレッドシート保存を追加
+const _originalConfirmIO = confirmIO;
+confirmIO = async function() {
+  const itemId = currentId;
+  const qty = parseInt(document.getElementById('modal-qty').value) || 1;
+  const staff = currentUser || 'スタッフ未設定';
+  const item = items.find(i => i.id === itemId);
+  if (!item) return;
+
+  // 元の処理を実行
+  _originalConfirmIO();
+
+  // スプレッドシートに保存
+  const log = logs[logs.length - 1];
+  if (log) await saveToSheet(itemId, log);
+};
+
+// ========================================
+// ログイン処理
+// ========================================
+function doLogin() {
+  const id = document.getElementById('login-id').value.trim();
+  const pass = document.getElementById('login-pass').value.trim();
+  if (id === 'coto' && pass === '4848') {
+    document.getElementById('login-screen').classList.add('hidden');
+    sessionStorage.setItem('loggedIn', '1');
+    loadFromSheet();
+  } else {
+    document.getElementById('login-error').style.display = 'block';
+    document.getElementById('login-pass').value = '';
+    document.getElementById('login-pass').focus();
+  }
+}
+
+// セッション確認（リロード時はログイン画面を再表示しない）
+if (sessionStorage.getItem('loggedIn') === '1') {
+  document.getElementById('login-screen').classList.add('hidden');
+  loadFromSheet();
+}
+
+// 起動
+
+</script>
+</body>
+</html>
