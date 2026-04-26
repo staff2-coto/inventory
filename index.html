@@ -901,9 +901,13 @@ function saveMaster() {
   closeAll();
   buildFilters();
   renderItems();
-  if (type==='category') renderCategories();
-  else if (type==='property') renderProperties();
-  else {
+  if (type==='category') {
+    renderCategories();
+    if (gasConnected) gasPost({ action: 'saveCategories', categories }).catch(() => showToast('⚠️ 設備種類の保存に失敗しました', true));
+  } else if (type==='property') {
+    renderProperties();
+    if (gasConnected) gasPost({ action: 'saveProperties', properties: allProperties }).catch(() => showToast('⚠️ 物件名の保存に失敗しました', true));
+  } else {
     renderStaff();
     if (gasConnected) gasPost({ action: 'saveStaff', staffList }).catch(() => showToast('⚠️ スタッフ保存に失敗しました', true));
   }
@@ -922,11 +926,15 @@ function deleteMaster(type, index) {
   if (!confirm(`「${name}」を削除しますか？${warn}`)) return;
   data.splice(index, 1);
   buildFilters();
-  if (type==='category') renderCategories();
-  else if (type==='property') renderProperties();
-  else {
+  if (type==='category') {
+    renderCategories();
+    if (gasConnected) gasPost({ action: 'saveCategories', categories }).catch(() => {});
+  } else if (type==='property') {
+    renderProperties();
+    if (gasConnected) gasPost({ action: 'saveProperties', properties: allProperties }).catch(() => {});
+  } else {
     renderStaff();
-    if (gasConnected) gasPost({ action: 'saveStaff', staffList }).catch(() => showToast('⚠️ スタッフ保存に失敗しました', true));
+    if (gasConnected) gasPost({ action: 'saveStaff', staffList }).catch(() => {});
   }
 }
 
@@ -1021,6 +1029,10 @@ function confirmIO() {
     if (item.carStock < qty) { alert('車載中の在庫数が不足しています'); return; }
     item.carStock -= qty;
     logs.push({ itemId:item.id, itemName:item.name, type:'out', qty, staff, date:now(), note:'販売' });
+  } else if (currentIOType === 'deliver') {
+    if (item.carStock < qty) { alert('車載中の在庫数が不足しています'); return; }
+    item.carStock -= qty;
+    logs.push({ itemId:item.id, itemName:item.name, type:'out', qty, staff, date:now(), note:'納品' });
   } else if (currentIOType === 'out') {
     if (currentIOSubType === 'car') {
       if (item.stock < qty) { alert('倉庫の在庫数が不足しています'); return; }
@@ -1126,13 +1138,13 @@ function saveForm() {
 }
 
 // 車載在庫
-function sellFromCar(itemId) {
+function sellFromCar(itemId, mode = 'sell') {
   const item = items.find(i => i.id === itemId);
   currentId = itemId;
-  currentIOType = 'sell';
+  currentIOType = mode;
   document.getElementById('modal-io-name').textContent = item.name;
-  document.getElementById('modal-io-title').textContent = '販売を記録';
-  document.getElementById('modal-io-btn').textContent = '販売確定';
+  document.getElementById('modal-io-title').textContent = mode === 'sell' ? '販売を記録' : '納品を記録';
+  document.getElementById('modal-io-btn').textContent = mode === 'sell' ? '販売確定' : '納品確定';
   document.getElementById('modal-qty').value = 1;
   document.getElementById('modal-staff-name').textContent = currentUser || 'スタッフ未設定';
   document.getElementById('modal-type-row').style.display = 'none';
@@ -1178,8 +1190,9 @@ function renderCar() {
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid #f0f0f0">
         <div style="font-size:12px;color:#888">倉庫在庫：${item.stock}個</div>
         <div style="display:flex;gap:8px">
-          <button onclick="sellFromCar(${item.id})" style="height:34px;padding:0 16px;border-radius:8px;border:1px solid #a5d6a7;font-size:13px;cursor:pointer;background:#e8f5e9;color:#2e7d32;font-weight:600;white-space:nowrap">販売</button>
-          <button onclick="returnFromCar(${item.id})" style="height:34px;padding:0 16px;border-radius:8px;border:1px solid #ddd;font-size:13px;cursor:pointer;background:#f5f5f5;white-space:nowrap">倉庫へ返却</button>
+          <button onclick="sellFromCar(${item.id},'sell')" style="height:34px;padding:0 12px;border-radius:8px;border:1px solid #a5d6a7;font-size:13px;cursor:pointer;background:#e8f5e9;color:#2e7d32;font-weight:600;white-space:nowrap">販売</button>
+          <button onclick="sellFromCar(${item.id},'deliver')" style="height:34px;padding:0 12px;border-radius:8px;border:1px solid #aac4f0;font-size:13px;cursor:pointer;background:#e8f0fe;color:#1a5dc8;font-weight:600;white-space:nowrap">納品</button>
+          <button onclick="returnFromCar(${item.id})" style="height:34px;padding:0 12px;border-radius:8px;border:1px solid #ddd;font-size:13px;cursor:pointer;background:#f5f5f5;white-space:nowrap">倉庫へ返却</button>
         </div>
       </div>
     </div>`).join('');
@@ -1734,6 +1747,20 @@ async function loadFromSheet() {
     projects.length = 0;
     if (result.projects && result.projects.length > 0) {
       result.projects.forEach(p => projects.push(p));
+    }
+
+    // 設備種類・物件名
+    if (result.categories && result.categories.length > 0) {
+      categories.length = 0;
+      result.categories.forEach(c => categories.push(c));
+    } else if (categories.length > 0) {
+      await gasPost({ action: 'saveCategories', categories });
+    }
+    if (result.properties && result.properties.length > 0) {
+      allProperties.length = 0;
+      result.properties.forEach(p => allProperties.push(p));
+    } else if (allProperties.length > 0) {
+      await gasPost({ action: 'saveProperties', properties: allProperties });
     }
 
   } catch (e) {
