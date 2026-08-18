@@ -89,7 +89,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', sans-ser
 .log-table tr:last-child td { border-bottom: none; }
 .log-plus { color: #2e7d32; font-weight: 600; }
 .log-minus { color: #c0392b; font-weight: 600; }
-.log-edit { color: #7b2db0; font-weight: 600; }
 /* モーダル */
 .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 100; }
 .modal-bg.open { display: flex; }
@@ -316,12 +315,6 @@ input[type=number] { -moz-appearance: textfield; }
         <div class="summary-card"><div class="summary-label">車載品目数</div><div class="summary-value" id="car-item-count" style="color:#1a5dc8">-</div></div>
         <div class="summary-card"><div class="summary-label">車載合計数</div><div class="summary-value" id="car-total-count" style="color:#1a5dc8">-</div></div>
       </div>
-      <div class="filter-area" style="margin-bottom:16px">
-        <div class="filter-row">
-          <span class="filter-label">検索</span>
-          <input type="text" class="search-input" id="car-search" placeholder="品名・IDで検索" oninput="renderCar()" />
-        </div>
-      </div>
       <div id="car-list"></div>
     </div>
 
@@ -350,24 +343,6 @@ input[type=number] { -moz-appearance: textfield; }
     <div id="page-csv" class="page">
       <div class="page-header">
         <div><h1>CSV管理</h1><p>品目データのエクスポート・インポートができます</p></div>
-      </div>
-
-      <!-- 在庫レポート出力 -->
-      <div style="background:#fff;border-radius:12px;border:1px solid #e8e8e8;padding:24px;margin-bottom:20px">
-        <h2 style="font-size:16px;font-weight:600;margin-bottom:8px">📋 在庫レポート出力</h2>
-        <p style="font-size:13px;color:#888;margin-bottom:16px">現時点の在庫数をCSVで出力します。定期チェックや報告用にお使いください。</p>
-        <div class="form-row" style="margin-bottom:16px">
-          <label>担当者</label>
-          <select id="report-staff" style="max-width:240px"></select>
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn-primary" onclick="exportCarReport()" style="background:#1a5dc8">🚗 車載在庫レポート</button>
-          <button class="btn-primary" onclick="exportFullReport()">📦 全体在庫レポート</button>
-        </div>
-        <div style="background:#f5f5f5;border-radius:8px;padding:12px;margin-top:16px;font-size:12px;color:#555;line-height:1.7">
-          <strong>車載在庫レポート：</strong>車に積んでいる品目のみ（週1回の車載チェック用）<br>
-          <strong>全体在庫レポート：</strong>倉庫・車載・原状回復中をすべて含む（定期清掃後の総チェック用）
-        </div>
       </div>
 
       <!-- Airレジ売上CSV取込 -->
@@ -446,7 +421,6 @@ input[type=number] { -moz-appearance: textfield; }
             <button class="chip active" id="log-filter-all" onclick="setLogType('all')">すべて</button>
             <button class="chip" id="log-filter-in" onclick="setLogType('in')">入庫</button>
             <button class="chip" id="log-filter-out" onclick="setLogType('out')">出庫</button>
-            <button class="chip" id="log-filter-edit" onclick="setLogType('edit')">編集</button>
           </div>
         </div>
         <div class="filter-row">
@@ -641,14 +615,13 @@ function showPage(page) {
     el.classList.toggle('active', el.getAttribute('onclick') === `showPage('${page}')`);
   });
   if (page === 'car') renderCar();
-  if (page === 'log') { logTypeFilter = 'all'; logStaffFilter = 'すべて'; ['all','in','out','edit'].forEach(t => document.getElementById('log-filter-'+t)?.classList.toggle('active', t==='all')); setTimeout(() => renderLogs(), 0); }
+  if (page === 'log') { logTypeFilter = 'all'; logStaffFilter = 'すべて'; ['all','in','out'].forEach(t => document.getElementById('log-filter-'+t)?.classList.toggle('active', t==='all')); setTimeout(() => renderLogs(), 0); }
   if (page === 'categories') renderCategories();
   if (page === 'properties') renderProperties();
   if (page === 'staff') renderStaff();
   if (page === 'stocktake') renderStocktake();
   if (page === 'restoration') renderRestoration();
   if (page === 'tasks') renderTasks();
-  if (page === 'csv') buildReportStaffSelect();
 }
 
 function now() {
@@ -846,7 +819,7 @@ let logLoadedAll = false;   // 全件読み込み済みフラグ
 
 function setLogType(type) {
   logTypeFilter = type;
-  ['all','in','out','edit'].forEach(t => {
+  ['all','in','out'].forEach(t => {
     document.getElementById('log-filter-' + t)?.classList.toggle('active', t === type);
   });
   renderLogs();
@@ -863,9 +836,7 @@ async function deleteLog(index) {
   if (!log) return;
   // ★ 取り消したときに在庫がどこに戻るかを判定してメッセージに明示
   let backTo = '倉庫在庫';
-  if (log.type === 'edit') {
-    backTo = '倉庫在庫';
-  } else if (log.type === 'out') {
+  if (log.type === 'out') {
     if (log.note && log.note.includes('車に積込')) backTo = '倉庫在庫';
     else if (log.note && log.note.includes('原状回復')) backTo = '倉庫在庫';
     else if (log.note && (log.note.includes('販売') || log.note.includes('納品') || log.note.includes('使用（見積もり作業）'))) backTo = '車載在庫';
@@ -874,25 +845,12 @@ async function deleteLog(index) {
     if (log.note && log.note.includes('車載から入庫')) backTo = '車載在庫';
     else backTo = '倉庫在庫';
   }
-  const typeLabel = log.type === 'edit' ? '編集' : log.type === 'in' ? '入庫' : '出庫';
-  const confirmMsg = log.type === 'edit'
-    ? `この編集履歴を取り消しますか？\n${log.itemName}\n${log.note || ''}\n※編集前の在庫数に戻ります`
-    : `この履歴を取り消しますか？\n${log.itemName}　${typeLabel} ${log.qty}個\n※${backTo}に${log.qty}個戻ります`;
-  if (!await showConfirm(confirmMsg, '取り消す', true)) return;
+  if (!await showConfirm(`この履歴を取り消しますか？\n${log.itemName}　${log.type==='in'?'入庫':'出庫'} ${log.qty}個\n※${backTo}に${log.qty}個戻ります`, '取り消す', true)) return;
 
   // 在庫を元に戻す
   const item = items.find(i => i.id === log.itemId);
   if (item) {
-    if (log.type === 'edit') {
-      // ★ 編集の取り消し：note の「（10→7）」から編集前の値を復元
-      const m = String(log.note || '').match(/（(\d+)→(\d+)）/);
-      if (m) {
-        item.stock = parseInt(m[1]);
-      } else {
-        // note から復元できない場合は差分で戻す
-        item.stock = Math.max(0, item.stock - log.qty);
-      }
-    } else if (log.type === 'out') {
+    if (log.type === 'out') {
       // 出庫を取り消し → どこから出たかによって戻す先を判定
       if (log.note && log.note.includes('車に積込')) {
         // 倉庫→車載 だったので、倉庫に戻し車載を減らす
@@ -987,12 +945,11 @@ function renderLogs() {
   tbody.innerHTML = sorted.map(l => {
     const isIn = l.type==='in';
     const originalIndex = logs.indexOf(l);
-    const isEdit = l.type==='edit';
     return `<tr>
       <td>${formatDate(l.date)}</td>
       <td>${l.itemName}</td>
-      <td>${isEdit?'編集':isIn?'入庫':'出庫'}</td>
-      <td class="${isEdit?'log-edit':isIn?'log-plus':'log-minus'}">${isEdit?'':isIn?'+':'-'}${l.qty}</td>
+      <td>${isIn?'入庫':'出庫'}</td>
+      <td class="${isIn?'log-plus':'log-minus'}">${isIn?'+':'-'}${l.qty}</td>
       <td>${l.staff}</td>
       <td style="color:#888;font-size:12px">${l.note||''}</td>
       <td style="white-space:nowrap"><button onclick="deleteLog(${originalIndex})" style="height:26px;padding:0 10px;border-radius:6px;border:1px solid #f0c0c0;font-size:11px;cursor:pointer;background:#fff;color:#c0392b;white-space:nowrap;line-height:1">取消</button></td>
@@ -1009,7 +966,7 @@ function renderLogs() {
             <div class="log-card-name">${l.itemName}</div>
             <div class="log-card-meta">${formatDate(l.date)}　${l.staff}</div>
           </div>
-          <span class="log-card-qty ${l.type==='edit'?'log-edit':isIn?'log-plus':'log-minus'}">${l.type==='edit'?'編集':isIn?'入庫':'出庫'} ${l.type==='edit'?'':isIn?'+':'-'}${l.qty}</span>
+          <span class="log-card-qty ${isIn?'log-plus':'log-minus'}">${isIn?'入庫':'出庫'} ${isIn?'+':'-'}${l.qty}</span>
         </div>
         <div class="log-card-bottom">
           <span class="log-card-note">${l.note||''}</span>
@@ -1457,28 +1414,9 @@ function saveForm() {
     items.push(newItem);
     if (gasConnected) gasPost({ action: 'addItem', item: newItem }).catch(() => showToast('⚠️ 追加の同期に失敗しました', true));
   } else {
-    const target = items.find(i => i.id===currentId);
-    const oldStock = target.stock; // ★ 編集前の在庫数を控える
-    Object.assign(target, { name, category, properties: selectedProps, stock, minStock, memo });
-    const updatedItem = target;
+    Object.assign(items.find(i => i.id===currentId), { name, category, properties: selectedProps, stock, minStock, memo });
+    const updatedItem = items.find(i => i.id===currentId);
     if (gasConnected) gasPost({ action: 'updateItem', item: updatedItem }).catch(() => showToast('⚠️ 更新の同期に失敗しました', true));
-
-    // ★ 在庫数が変わった場合は「編集」として履歴に残す
-    if (oldStock !== stock) {
-      const diff = stock - oldStock;
-      const log = {
-        itemId: updatedItem.id,
-        itemName: updatedItem.name,
-        type: 'edit',
-        qty: Math.abs(diff),
-        staff: currentUser || 'スタッフ未設定',
-        date: now(),
-        note: `編集による在庫調整（${oldStock}→${stock}）`
-      };
-      logs.push(log);
-      if (gasConnected) gasPost({ action: 'addLog', log }).catch(() => showToast('⚠️ 履歴の保存に失敗しました', true));
-      renderLogs();
-    }
   }
   closeAll(); buildFilters(); renderItems();
 }
@@ -1512,19 +1450,13 @@ function returnFromCar(itemId) {
 }
 
 function renderCar() {
-  const q = (document.getElementById('car-search')?.value || '').toLowerCase();
-  const carItems = items.filter(i => {
-    if (i.carStock <= 0) return false;
-    if (!q) return true;
-    return i.name.toLowerCase().includes(q) || String(i.id).includes(q);
-  });
-  // ★ サマリーは検索に関わらず全体の数を表示
-  const allCarItems = items.filter(i => i.carStock > 0);
-  document.getElementById('car-item-count').textContent = allCarItems.length;
-  document.getElementById('car-total-count').textContent = allCarItems.reduce((s, i) => s + i.carStock, 0);
+  const carItems = items.filter(i => i.carStock > 0);
+  const totalCount = carItems.reduce((s, i) => s + i.carStock, 0);
+  document.getElementById('car-item-count').textContent = carItems.length;
+  document.getElementById('car-total-count').textContent = totalCount;
   const list = document.getElementById('car-list');
   if (carItems.length === 0) {
-    list.innerHTML = `<div style="background:#fff;border-radius:12px;border:1px solid #e8e8e8;padding:48px;text-align:center;color:#aaa;font-size:14px">${q ? '該当する品目がありません' : '現在車に積まれている部品はありません'}</div>`;
+    list.innerHTML = '<div style="background:#fff;border-radius:12px;border:1px solid #e8e8e8;padding:48px;text-align:center;color:#aaa;font-size:14px">現在車に積まれている部品はありません</div>';
     return;
   }
   list.innerHTML = carItems.map(item => `
@@ -1649,107 +1581,6 @@ function cancelAirregiCSV() {
 // CSV管理
 let csvParsedData = [];
 
-// ========================================
-// 在庫レポート出力（スナップショット）
-// ========================================
-// 担当者セレクトを初期化
-function buildReportStaffSelect() {
-  const sel = document.getElementById('report-staff');
-  if (!sel) return;
-  sel.innerHTML = staffList.map(s =>
-    `<option value="${s}" ${s === currentUser ? 'selected' : ''}>${s}</option>`
-  ).join('');
-}
-
-// CSV用のセルをエスケープ
-function csvCell(v) {
-  return `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
-}
-
-// CSVをダウンロード
-function downloadCSV(lines, filename) {
-  const csv = lines.join('\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-// レポートのファイル名用の日付（20260718_2130）
-function reportStamp() {
-  const d = new Date();
-  const p = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
-}
-
-// 🚗 車載在庫レポート
-function exportCarReport() {
-  const staff = document.getElementById('report-staff')?.value || currentUser || 'スタッフ未設定';
-  const carItems = items.filter(i => i.carStock > 0);
-  if (carItems.length === 0) { alert('車載在庫がありません'); return; }
-
-  const lines = [];
-  lines.push(csvCell('車載在庫レポート'));
-  lines.push([csvCell('出力日時'), csvCell(now())].join(','));
-  lines.push([csvCell('担当者'), csvCell(staff)].join(','));
-  lines.push([csvCell('品目数'), csvCell(carItems.length)].join(','));
-  lines.push([csvCell('合計数'), csvCell(carItems.reduce((s, i) => s + i.carStock, 0))].join(','));
-  lines.push('');
-  lines.push(['ID','品名','設備種類','物件名','車載在庫数','実数（記入欄）','備考'].map(csvCell).join(','));
-  carItems.forEach(i => {
-    lines.push([
-      csvCell(i.id), csvCell(i.name), csvCell(i.category),
-      csvCell(i.properties.join('・')), csvCell(i.carStock),
-      csvCell(''), csvCell(i.memo || '')
-    ].join(','));
-  });
-
-  downloadCSV(lines, `車載在庫レポート_${reportStamp()}.csv`);
-  showToast('✅ 車載在庫レポートを出力しました');
-}
-
-// 📦 全体在庫レポート
-function exportFullReport() {
-  const staff = document.getElementById('report-staff')?.value || currentUser || 'スタッフ未設定';
-  if (items.length === 0) { alert('品目がありません'); return; }
-
-  const totalStock = items.reduce((s, i) => s + i.stock, 0);
-  const totalCar = items.reduce((s, i) => s + i.carStock, 0);
-  const totalRest = items.reduce((s, i) => s + (i.restorationStock || 0), 0);
-
-  const lines = [];
-  lines.push(csvCell('全体在庫レポート'));
-  lines.push([csvCell('出力日時'), csvCell(now())].join(','));
-  lines.push([csvCell('担当者'), csvCell(staff)].join(','));
-  lines.push([csvCell('総品目数'), csvCell(items.length)].join(','));
-  lines.push([csvCell('倉庫在庫 合計'), csvCell(totalStock)].join(','));
-  lines.push([csvCell('車載在庫 合計'), csvCell(totalCar)].join(','));
-  lines.push([csvCell('原状回復中 合計'), csvCell(totalRest)].join(','));
-  lines.push([csvCell('在庫ゼロ品目数'), csvCell(items.filter(i => (i.stock + i.carStock + (i.restorationStock||0)) === 0).length)].join(','));
-  lines.push('');
-  lines.push(['★','ID','品名','設備種類','物件名','倉庫','車載','原状回復中','合計','最低在庫数','状態','備考'].map(csvCell).join(','));
-  items.forEach(i => {
-    const total = i.stock + i.carStock + (i.restorationStock || 0);
-    const state = total === 0 ? '在庫ゼロ'
-      : (i.minStock > 0 && i.stock <= i.minStock) ? '在庫少'
-      : '在庫あり';
-    lines.push([
-      csvCell(i.favorite ? '★' : ''),
-      csvCell(i.id), csvCell(i.name), csvCell(i.category),
-      csvCell(i.properties.join('・')),
-      csvCell(i.stock), csvCell(i.carStock), csvCell(i.restorationStock || 0),
-      csvCell(total), csvCell(i.minStock || 0), csvCell(state),
-      csvCell(i.memo || '')
-    ].join(','));
-  });
-
-  downloadCSV(lines, `全体在庫レポート_${reportStamp()}.csv`);
-  showToast('✅ 全体在庫レポートを出力しました');
-}
-
 function exportCSV() {
   const header = ['ID', '品名', '設備種類', '物件名', '在庫数', '最低在庫数', '備考'];
   const rows = items.map(i => [
@@ -1817,9 +1648,10 @@ function parseCSVLine(line) {
   return result;
 }
 
-function importCSV() {
+async function importCSV() {
   if (!csvParsedData.length) return;
   let updated = 0, added = 0;
+  const changedItems = []; // ★ GASに送信する対象
   csvParsedData.forEach(row => {
     const id = parseInt(row['ID']);
     const stock = parseInt(row['在庫数']) || 0;
@@ -1831,9 +1663,12 @@ function importCSV() {
     const existing = items.find(i => i.id === id);
     if (existing) {
       Object.assign(existing, { name, category, properties, stock, minStock, memo });
+      changedItems.push({ item: existing, isNew: false });
       updated++;
     } else {
-      items.push({ id, name, category, properties, stock, minStock, memo, orderStatus: '', favorite: false });
+      const newItem = { id, name, category, properties, stock, minStock, memo, orderStatus: '', carStock: 0, restorationStock: 0, favorite: false };
+      items.push(newItem);
+      changedItems.push({ item: newItem, isNew: true });
       added++;
       if (id >= nextId) nextId = id + 1;
     }
@@ -1841,7 +1676,34 @@ function importCSV() {
   cancelCSV();
   buildFilters();
   renderItems();
-  alert(`インポート完了\n更新：${updated}件　追加：${added}件`);
+
+  // ★ スプレッドシートに反映（1件ずつ直列送信。件数が多いので進捗を表示）
+  if (gasConnected) {
+    showLoadingOverlay('スプレッドシートに反映中... (0/' + changedItems.length + ')');
+    let done = 0, failed = 0;
+    for (const c of changedItems) {
+      try {
+        if (c.isNew) {
+          await gasPost({ action: 'addItem', item: c.item });
+        } else {
+          await gasPost({ action: 'updateItem', item: c.item });
+        }
+      } catch (e) {
+        failed++;
+      }
+      done++;
+      const msg = document.getElementById('loading-msg');
+      if (msg) msg.textContent = 'スプレッドシートに反映中... (' + done + '/' + changedItems.length + ')';
+    }
+    hideLoadingOverlay();
+    if (failed > 0) {
+      alert(`インポート完了（一部失敗）\n更新：${updated}件　追加：${added}件\n⚠️ ${failed}件がスプレッドシートに反映できませんでした。再度お試しください。`);
+    } else {
+      alert(`インポート完了\n更新：${updated}件　追加：${added}件\n✅ スプレッドシートに反映しました`);
+    }
+  } else {
+    alert(`インポート完了（オフライン）\n更新：${updated}件　追加：${added}件\n⚠️ スプレッドシートには反映されていません`);
+  }
 }
 
 function cancelCSV() {
