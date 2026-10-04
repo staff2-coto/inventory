@@ -2117,53 +2117,91 @@ async function completeTask(taskId) {
 // ========================================
 // 原状回復工事
 // ========================================
+let showArchivedProjects = false; // アーカイブを開いているか
+
+function toggleArchivedView() {
+  showArchivedProjects = !showArchivedProjects;
+  renderRestoration();
+}
+
+// 工事カード1枚分
+function projectCard(p) {
+  const totalItems = p.usedItems ? p.usedItems.length : 0;
+  const totalQty = p.usedItems ? p.usedItems.reduce((s, i) => s + i.qty, 0) : 0;
+  const isActive = p.status === 'active';
+  const isArchived = p.status === 'archived';
+  const statusColor = isActive ? '#2E75B6' : isArchived ? '#888888' : '#2e7d32';
+  const statusLabel = isActive ? '進行中' : isArchived ? 'アーカイブ' : '完了';
+  const btn = 'height:34px;border-radius:8px;border:1px solid #ddd;font-size:13px;cursor:pointer;';
+  const delBtn = `<button onclick="deleteProject('${p.id}')" style="${btn}padding:0 14px;border-color:#f0c0c0;background:#fff;color:#c0392b">削除</button>`;
+  let buttons = '';
+  if (isActive) {
+    buttons = `
+      <button onclick="openEditProject('${p.id}')" style="${btn}flex:1;background:#fff">編集</button>
+      <button onclick="toggleProjectStatus('${p.id}')" style="${btn}flex:1;background:#f5f5f5">完了にする</button>
+      ${delBtn}`;
+  } else if (isArchived) {
+    buttons = `
+      <button onclick="unarchiveProject('${p.id}')" style="${btn}flex:1;background:#fff">一覧に戻す</button>
+      ${delBtn}`;
+  } else {
+    buttons = `
+      <button onclick="openEditProject('${p.id}')" style="${btn}flex:1;background:#fff">編集</button>
+      <button onclick="toggleProjectStatus('${p.id}')" style="${btn}flex:1;background:#f5f5f5">進行中に戻す</button>
+      <button onclick="archiveProject('${p.id}')" style="${btn}flex:1;background:#f5f5f5">アーカイブ</button>
+      ${delBtn}`;
+  }
+  const shortages = tasks.filter(t => t.projectId === p.id && t.status === 'shortage');
+  return `<div style="background:#fff;border-radius:12px;border:1px solid #e8e8e8;padding:18px;margin-bottom:12px;${isArchived ? 'opacity:0.75;' : ''}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700;margin-bottom:4px">${p.name}</div>
+        <div style="font-size:12px;color:#888">📅 ${formatDate(p.date, true)}　👤 ${p.staff}</div>
+        ${!isActive && p.completedAt ? `<div style="font-size:12px;color:#2e7d32;margin-top:2px">✅ ${formatDate(p.completedAt)} 完了（${p.completedBy || '不明'}）</div>` : ''}
+        ${p.memo ? `<div style="font-size:12px;color:#555;margin-top:4px">📝 ${p.memo}</div>` : ''}
+      </div>
+      <span style="font-size:11px;padding:3px 10px;border-radius:99px;background:${statusColor}20;color:${statusColor};font-weight:600;white-space:nowrap">${statusLabel}</span>
+    </div>
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0;font-size:12px;color:#888">
+      使用品目：${totalItems}種　合計出庫数：${totalQty}個
+    </div>
+    ${totalItems > 0 ? `
+    <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">
+      ${p.usedItems.map(i => `<span style="font-size:11px;background:#f5f5f5;padding:2px 8px;border-radius:99px;color:#555">${i.name} ×${i.qty}</span>`).join('')}
+    </div>` : ''}
+    ${shortages.length > 0 ? `
+    <div style="margin-top:8px;padding:8px 12px;background:#fff3f3;border-radius:8px;border:1px solid #f0c0c0">
+      <div style="font-size:12px;font-weight:600;color:#c0392b;margin-bottom:4px">⚠️ 在庫不足</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">
+        ${shortages.map(t => `<span style="font-size:11px;background:#fde8e8;padding:2px 8px;border-radius:99px;color:#c0392b">${t.itemName} ${t.qty}個不足</span>`).join('')}
+      </div>
+    </div>` : ''}
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">${buttons}
+    </div>
+  </div>`;
+}
+
 function renderRestoration() {
   const list = document.getElementById('restoration-list');
+  const visible = projects.filter(p => p.status !== 'archived').slice().reverse();
+  const archived = projects.filter(p => p.status === 'archived').slice().reverse();
+  const emptyBox = text => `<div style="background:#fff;border-radius:12px;border:1px solid #e8e8e8;padding:48px;text-align:center;color:#aaa;font-size:14px">${text}</div>`;
+
   if (projects.length === 0) {
-    list.innerHTML = '<div style="background:#fff;border-radius:12px;border:1px solid #e8e8e8;padding:48px;text-align:center;color:#aaa;font-size:14px">プロジェクトがありません</div>';
+    list.innerHTML = emptyBox('プロジェクトがありません');
     return;
   }
-  list.innerHTML = projects.slice().reverse().map(p => {
-    const totalItems = p.usedItems ? p.usedItems.length : 0;
-    const totalQty = p.usedItems ? p.usedItems.reduce((s, i) => s + i.qty, 0) : 0;
-    const statusColor = p.status === 'done' ? '#2e7d32' : '#2E75B6';
-    const statusLabel = p.status === 'done' ? '完了' : '進行中';
-    return `<div style="background:#fff;border-radius:12px;border:1px solid #e8e8e8;padding:18px;margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
-        <div style="flex:1">
-          <div style="font-size:15px;font-weight:700;margin-bottom:4px">${p.name}</div>
-          <div style="font-size:12px;color:#888">📅 ${formatDate(p.date, true)}　👤 ${p.staff}</div>
-          ${p.status === 'done' && p.completedAt ? `<div style="font-size:12px;color:#2e7d32;margin-top:2px">✅ ${formatDate(p.completedAt)} 完了（${p.completedBy || '不明'}）</div>` : ''}
-        ${p.memo ? `<div style="font-size:12px;color:#555;margin-top:4px">📝 ${p.memo}</div>` : ''}
-        </div>
-        <span style="font-size:11px;padding:3px 10px;border-radius:99px;background:${statusColor}20;color:${statusColor};font-weight:600;white-space:nowrap">${statusLabel}</span>
-      </div>
-      <div style="margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0;font-size:12px;color:#888">
-        使用品目：${totalItems}種　合計出庫数：${totalQty}個
-      </div>
-      ${p.usedItems && p.usedItems.length > 0 ? `
-      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px">
-        ${p.usedItems.map(i => `<span style="font-size:11px;background:#f5f5f5;padding:2px 8px;border-radius:99px;color:#555">${i.name} ×${i.qty}</span>`).join('')}
-      </div>` : ''}
-      ${(() => {
-        const shortages = tasks.filter(t => t.projectId === p.id && t.status === 'shortage');
-        if (shortages.length === 0) return '';
-        return `<div style="margin-top:8px;padding:8px 12px;background:#fff3f3;border-radius:8px;border:1px solid #f0c0c0">
-          <div style="font-size:12px;font-weight:600;color:#c0392b;margin-bottom:4px">⚠️ 在庫不足</div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px">
-            ${shortages.map(t => `<span style="font-size:11px;background:#fde8e8;padding:2px 8px;border-radius:99px;color:#c0392b">${t.itemName} ${t.qty}個不足</span>`).join('')}
-          </div>
-        </div>`;
-      })()}
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <button onclick="openEditProject('${p.id}')" style="flex:1;height:34px;border-radius:8px;border:1px solid #ddd;font-size:13px;cursor:pointer;background:#fff">編集</button>
-        <button onclick="toggleProjectStatus('${p.id}')" style="flex:1;height:34px;border-radius:8px;border:1px solid #ddd;font-size:13px;cursor:pointer;background:#f5f5f5">
-          ${p.status === 'done' ? '進行中に戻す' : '完了にする'}
-        </button>
-        <button onclick="deleteProject('${p.id}')" style="height:34px;padding:0 14px;border-radius:8px;border:1px solid #f0c0c0;font-size:13px;cursor:pointer;background:#fff;color:#c0392b">削除</button>
-      </div>
-    </div>`;
-  }).join('');
+
+  let html = visible.length > 0 ? visible.map(projectCard).join('') : emptyBox('進行中・完了の工事はありません');
+
+  // アーカイブ（折りたたみ）
+  if (archived.length > 0) {
+    html += `<button onclick="toggleArchivedView()" style="width:100%;height:42px;margin-top:8px;margin-bottom:12px;border-radius:10px;border:1px dashed #ccc;background:#fafafa;color:#666;font-size:13px;cursor:pointer">
+      📦 アーカイブ ${archived.length}件を${showArchivedProjects ? '隠す ▲' : '表示 ▼'}
+    </button>`;
+    if (showArchivedProjects) html += archived.map(projectCard).join('');
+  }
+  list.innerHTML = html;
 }
 
 function openAddProject() {
@@ -2420,16 +2458,23 @@ async function toggleProjectStatus(projectId) {
   const p = projects.find(p => p.id === projectId);
   if (!p) return;
   const snap = snapStock((p.usedItems || []).map(u => u.id));
-  if (p.status === 'done') {
+  let msg = '';
+  if (p.status === 'active') {
+    // 完了にする → アーカイブするか確認（どちらを選んでも「完了」になる）
+    const archive = await showConfirm(
+      `「${p.name}」を完了にします。\nアーカイブに移動して、一覧から非表示にしますか？\n※アーカイブは一覧の下からいつでも確認・戻せます`,
+      'アーカイブする', false, '一覧に残す'
+    );
+    p.status = archive ? 'archived' : 'done';
+    p.completedAt = now();
+    p.completedBy = currentUser || 'スタッフ未設定';
+    msg = archive ? '✅ 完了にしてアーカイブしました' : '✅ 完了にしました';
+  } else {
     // 進行中に戻す → 完了情報をクリア
     p.status = 'active';
     p.completedAt = '';
     p.completedBy = '';
-  } else {
-    // 完了にする → 完了日時・完了者を記録
-    p.status = 'done';
-    p.completedAt = now();
-    p.completedBy = currentUser || 'スタッフ未設定';
+    msg = '✅ 進行中に戻しました';
   }
   recalcRestorationStock();
   renderRestoration();
@@ -2439,6 +2484,37 @@ async function toggleProjectStatus(projectId) {
     await pushStockDiff(snap); // 在庫の増減は無し。原状回復中の数だけ更新される
     const res = await gasPost({ action: 'saveProjects', projects });
     if (!res || !res.success) throw new Error('saveProjects failed');
+    showToast(msg);
+  } catch (e) {
+    showToast('⚠️ 保存に失敗しました。再読み込みして確認してください', true);
+  }
+}
+
+// 完了済みの工事をアーカイブへ（在庫には影響しない）
+async function archiveProject(projectId) {
+  const p = projects.find(p => p.id === projectId);
+  if (!p) return;
+  p.status = 'archived';
+  if (!p.completedAt) { p.completedAt = now(); p.completedBy = currentUser || 'スタッフ未設定'; }
+  await saveProjectsOnly('✅ アーカイブしました');
+}
+
+// アーカイブから一覧に戻す（「完了」の状態で戻る）
+async function unarchiveProject(projectId) {
+  const p = projects.find(p => p.id === projectId);
+  if (!p) return;
+  p.status = 'done';
+  await saveProjectsOnly('✅ 一覧に戻しました');
+}
+
+// プロジェクト情報だけ保存（在庫が動かない操作用）
+async function saveProjectsOnly(okMsg) {
+  renderRestoration();
+  if (!gasConnected) return;
+  try {
+    const res = await gasPost({ action: 'saveProjects', projects });
+    if (!res || !res.success) throw new Error('saveProjects failed');
+    showToast(okMsg);
   } catch (e) {
     showToast('⚠️ 保存に失敗しました。再読み込みして確認してください', true);
   }
@@ -2503,7 +2579,7 @@ async function deleteProject(projectId) {
 // ========================================
 // カスタム確認ダイアログ（iPhone Safari の confirm() ブロック対策）
 // ========================================
-function showConfirm(message, okLabel, isDanger) {
+function showConfirm(message, okLabel, isDanger, cancelLabel) {
   return new Promise(resolve => {
     const overlay = document.getElementById('custom-confirm-overlay');
     const msg = document.getElementById('custom-confirm-message');
@@ -2511,6 +2587,7 @@ function showConfirm(message, okLabel, isDanger) {
     const cancelBtn = document.getElementById('custom-confirm-cancel');
     msg.textContent = message;
     okBtn.textContent = okLabel || 'OK';
+    cancelBtn.textContent = cancelLabel || 'キャンセル';
     okBtn.className = isDanger ? 'danger' : '';
     overlay.classList.add('open');
     const close = (result) => {
